@@ -20,11 +20,11 @@
 
 
 //NEW MACROS
-#define LimitSWXMin DigitalIoPin(0,DigitalIoPin::pullup,true)
-#define LimitSWXMax DigitalIoPin(1,DigitalIoPin::pullup,true)
+#define LimitSWYMin DigitalIoPin(0,DigitalIoPin::pullup,true)
+#define LimitSWYMax DigitalIoPin(1,DigitalIoPin::pullup,true)
 
-#define LimitSWYMin DigitalIoPin(3,DigitalIoPin::pullup,true)
-#define LimitSWYMax DigitalIoPin(4,DigitalIoPin::pullup,true)
+#define LimitSWXMin DigitalIoPin(3,DigitalIoPin::pullup,true)
+#define LimitSWXMax DigitalIoPin(4,DigitalIoPin::pullup,true)
 
 
 //PWM FOR LASER ?

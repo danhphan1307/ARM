@@ -19,7 +19,7 @@ public:
 	void write(char *description);
 	void writeChar(char charNum);
 	void writeInt(int number);
-	void getCommand();
+	void getCommand(bool stop,QueueHandle_t xQueue);
 private:
 	SemaphoreHandle_t syslogMutex;
 	int word_count = 0;
@@ -59,18 +59,28 @@ void Syslog::writeInt(int number){
 }
 
 
-void Syslog::getCommand(){
+void Syslog::getCommand(bool stop,QueueHandle_t xQueue){
 
 	int num = Board_UARTGetChar();
 
 	if (num!=EOF){
-
 		command[word_count] = num;
 		Board_UARTPutChar(num);
 		word_count++;
 		if(xSemaphoreTake(syslogMutex, LONG_DELAY) == pdTRUE) {
 			if (num == 13 || num == 10 ){
-				Board_UARTPutSTR("\r\n");
+
+				if (strstr(command,"go") != NULL){
+					stop = false;
+				} else if (strstr(command,"stop") != NULL){
+					if (xQueueSendToFront(xQueue,command,(TickType_t) 10)==pdTRUE){}
+				} else {
+					if (xQueueSendToBack(xQueue,command,(TickType_t) 10) == pdTRUE){
+						Board_UARTPutSTR("OK\r\n");
+					} else {
+						Board_UARTPutSTR("Queue is full\r\n");
+					}
+				}
 				Board_UARTPutSTR(command);
 				word_count=0;
 				memset(command, 0, sizeof(command));

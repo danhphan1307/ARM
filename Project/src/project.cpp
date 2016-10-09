@@ -51,7 +51,7 @@ volatile bool RIT_calibrate;
 enum RIT_TYPE  {CALIBRATE, COMMAND};
 RIT_TYPE RIT_type;
 xSemaphoreHandle sbRIT = xSemaphoreCreateBinary();
-QueueHandle_t xQueue = xQueueCreate(5,sizeof(char[100]));
+QueueHandle_t xQueue = xQueueCreate(100,sizeof(char[30]));
 static xSemaphoreHandle semaphore = xSemaphoreCreateBinary();
 volatile bool stopFlag = false;
 
@@ -149,38 +149,18 @@ void RIT_start(int count, int us, RIT_TYPE type)
 //UART Semaphore task
 int word_count =0;
 char command[100] = "";
-bool stop = true;
+volatile bool stop = true;
+Syslog syslog;
+
 //Task for UART Input
 static void UARTTask(void *params) {
 	while (1) {
-
 		if (stepper.getCalibrateFlag()){
 			//A very large number of step to get it moving
 			RIT_start(10000,TICK_RATE/stepper.getPps(),CALIBRATE);
 		} else {
-			int num = Board_UARTGetChar();
-			if (num!=EOF){
-				command[word_count] = num;
-				Board_UARTPutChar(num);
-				word_count++;
-				if (num == 13 || num == 10 ){
-					if (strstr(command,"go") != NULL){
-						//xSemaphoreGive(params);
-						stop = false;
-					} else if (strstr(command,"stop") != NULL){
-						if (xQueueSendToFront(xQueue,command,(TickType_t) 10)==pdTRUE){}
-					} else {
-						if (xQueueSendToBack(xQueue,command,(TickType_t) 10) == pdTRUE){
-
-						} else {
-							Board_UARTPutSTR("Queue is full\r\n");
-						}
-					}
-					Board_UARTPutSTR("\r\n");
-					word_count=0;
-					memset(command, 0, sizeof(command));
-				}
-			}
+			//Gcode
+			syslog->getCommand(stop,xQueue);
 		}
 	}
 }

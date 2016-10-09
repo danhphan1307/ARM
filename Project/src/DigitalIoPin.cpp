@@ -6,8 +6,10 @@
  */
 #include "DigitalIoPin.h"
 #include "chip.h"
-const int DigitalIoPin::dPort[] = { 0, 1, 1, 0, 0, 1, 0};
-const int DigitalIoPin::dPin[] = { 17, 11, 9, 27, 28, 0, 24};
+//									0	1	  2	   3	4	 5	  6		7	 8		9	 10	  11   12
+//								    D2   D3   D4   D6   D7   D8   D9   D10   D11   D12   A0   A1   A2
+const int DigitalIoPin::dPort[] ={  0,   0,   0,   1,   0,   0,   1,   0,    0,    0,    0,   1,   1 };
+const int DigitalIoPin::dPin[] = { 29,   9,   10,   3,   0,   24,  0,   27,   28,   12,   8,   6,   8 };
 #define RESERVED 0x80
 DigitalIoPin::DigitalIoPin(int arduinoPin, pinMode mode, bool invert) {
 	// ugly but at this point I don't want to throw exceptions
@@ -40,4 +42,3 @@ bool DigitalIoPin::read() {
 void DigitalIoPin::write(bool value) {
 	return Chip_GPIO_SetPinState(LPC_GPIO, port, pin, value);
 }
-

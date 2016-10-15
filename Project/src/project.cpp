@@ -38,175 +38,34 @@
 #include <stdlib.h>
 #include "../freertos/inc/semphr.h"
 #include "Macro.h"
-#include "Stepper.h"
 #include "Syslog.h"
 #include <string.h>
 
 Syslog* syslog = new Syslog();
-Stepper stepper;
-
-#define TICK_RATE 1000000
-volatile uint32_t RIT_count;
-volatile bool RIT_calibrate;
-enum RIT_TYPE  {CALIBRATE, COMMAND};
-RIT_TYPE RIT_type;
-xSemaphoreHandle sbRIT = xSemaphoreCreateBinary();
-QueueHandle_t xQueue = xQueueCreate(100,sizeof(char[30]));
-static xSemaphoreHandle semaphore = xSemaphoreCreateBinary();
-volatile bool stopFlag = false;
-
+QueueHandle_t xQueue = xQueueCreate(40,sizeof(char[100]));
 
 static void prvSetupHardware(void)
 {
 	SystemCoreClockUpdate();
 	Board_Init();
 	Board_LED_Set(0, false);
-	Board_LED_Set(1, false);
-	//Init RIT
-	Chip_RIT_Init(LPC_RITIMER);
-	// set the priority level of the interrupt
-	// The level must be equal or lower than the maximum priority specified in FreeRTOS config
-	// Note that in a Cortex-M3 a higher number indicates lower interrupt priority
-	NVIC_SetPriority( RITIMER_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 1 );
 }
 
-
-//RIT Handler
-extern "C" {
-void RIT_IRQHandler(void)
-{
-	// This used to check if a context switch is required
-	portBASE_TYPE xHigherPriorityWoken = pdFALSE;
-	// Tell timer that we have processed the interrupt.
-	// Timer then removes the IRQ until next match occurs
-	Chip_RIT_ClearIntStatus(LPC_RITIMER); // clear IRQ flag
-
-	switch (RIT_type){
-	case CALIBRATE:
-		if (stepper.getCalibrateFlag()){
-			stepper.calibrate();
-		} else {
-			Chip_RIT_Disable(LPC_RITIMER); // disable timer
-			// Give semaphore and set context switch flag if a higher priority task was woken up
-			xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
-		}
-		break;
-	case COMMAND:
-		if(RIT_count > 0) {
-			RIT_count--;
-			// do something useful here...
-			stepper.run();
-			//Give back semaphore when switch is on
-			if (stepper.getReleaseFlag()){
-				RIT_count = 0;
-			}
-
-		}
-		else {
-			Chip_RIT_Disable(LPC_RITIMER); // disable timer
-			// Give semaphore and set context switch flag if a higher priority task was woken up
-			xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
-		}
-		break;
-	}
-
-	// End the ISR and (possibly) do a context switch
-	portEND_SWITCHING_ISR(xHigherPriorityWoken);
-}
-}
-
-
-void RIT_start(int count, int us, RIT_TYPE type)
-{
-	uint64_t cmp_value;
-	// Determine approximate compare value based on clock rate and passed interval
-	cmp_value = (uint64_t) Chip_Clock_GetSystemClockRate() * (uint64_t) us / 1000000;
-	// disable timer during configuration
-	Chip_RIT_Disable(LPC_RITIMER);
-	RIT_count = count;
-	RIT_type = type;
-	// enable automatic clear on when compare value==timer value
-	// this makes interrupts trigger periodically
-	Chip_RIT_EnableCompClear(LPC_RITIMER);
-	// reset the counter
-	Chip_RIT_SetCounter(LPC_RITIMER, 0);
-	Chip_RIT_SetCompareValue(LPC_RITIMER, cmp_value);
-	// start counting
-	Chip_RIT_Enable(LPC_RITIMER);
-	// Enable the interrupt signal in NVIC (the interrupt controller)
-	NVIC_EnableIRQ(RITIMER_IRQn);
-
-	// wait for ISR to tell that we're done
-	if(xSemaphoreTake(sbRIT, portMAX_DELAY) == pdTRUE) {
-		// Disable the interrupt signal in NVIC (the interrupt controller)
-		NVIC_DisableIRQ(RITIMER_IRQn);
-	}
-	else {
-		// unexpected error
-	}
-}
-
-//UART Semaphore task
-int word_count =0;
-char command[100] = "";
-volatile bool stop = true;
-Syslog syslog;
-
-//Task for UART Input
-static void UARTTask(void *params) {
-	while (1) {
-		if (stepper.getCalibrateFlag()){
-			//A very large number of step to get it moving
-			RIT_start(10000,TICK_RATE/stepper.getPps(),CALIBRATE);
-		} else {
-			//Gcode
-			syslog->getCommand(stop,xQueue);
-		}
-	}
-}
-
-static void CommandTask(void *params) {
-
+static void task1(void* param){
+	Syslog* guard = (Syslog*)param;
 	while(1){
-
-		while (!stop){
-			char receive[100];
-			while (xQueueReceive(xQueue,receive, (TickType_t) 10) && !stop){
-				if (strstr(receive,"stop") != NULL){
-					stop = true;
-				} else {
-					stepper.receiveCommand(receive,false);
-					RIT_start(stepper.getStep(),TICK_RATE/stepper.getPps(),COMMAND);
-				}
-			}
-		}
+		guard->getCommand(xQueue);
 	}
-
 }
-
-
-void showCommandGuideline(){
-	Board_UARTPutSTR("Command guideline: \r\n");
-	Board_UARTPutSTR("left <count>: runs stepper to <count> steps leftward \r\n");
-	Board_UARTPutSTR("right <count>: runs stepper to <count> steps rightward \r\n");
-	Board_UARTPutSTR("pps <count>: set number of driving pulses per sec \r\n");
-}
-
 
 int main(void)
 {
 	prvSetupHardware();
 
-	xTaskCreate(UARTTask, "UARTTask",
-			configMINIMAL_STACK_SIZE, semaphore, (tskIDLE_PRIORITY + 1UL),
+	xTaskCreate(task1, "task1",
+			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-
-	xTaskCreate(CommandTask, "CommandTask",
-			configMINIMAL_STACK_SIZE, semaphore, (tskIDLE_PRIORITY + 1UL),
-			(TaskHandle_t *) NULL);
-
-	showCommandGuideline();
-
+	syslog->InitMap();
 	/* Start the scheduler */
 	vTaskStartScheduler();
 

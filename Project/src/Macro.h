@@ -13,7 +13,6 @@
 #endif /* MACROS_H_ */
 
 
-
 #define DLY1MS (1/portTICK_PERIOD_MS)
 #define DLY20MS (20/portTICK_PERIOD_MS)
 #define DLY1SEC (1000/portTICK_PERIOD_MS)

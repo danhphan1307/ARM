@@ -5,8 +5,8 @@
  *      Author: abdullai
  */
 #include "Motor.h"
+#include <math.h>
 
-//
 
 Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin* Lmax)
 {
@@ -21,7 +21,10 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin*
 	stepCount = 0;
 	Maxstepnum = 0;
 	CurPos = 0;
-	pps = 0;
+	pps = 500;
+
+	minStepCmMRetio = 0.0;
+	maxStepCmMRetio = 0.0;
 	DIR->write(false);
 
 }
@@ -41,6 +44,7 @@ void Motor::stop()
 
 
 }
+
 
 void Motor::reverse()
 {
@@ -62,9 +66,11 @@ void Motor::move()
 {
 	STEP->write(true);
 	vTaskDelay(DLY1MS);
-	STEP->write(false);
 	stepCount++;
+	STEP->write(false);
+
 }
+
 
 void Motor::setStepNum(int s)
 {
@@ -159,15 +165,73 @@ moveDirType Motor::getMoveType()
 	return moveType;
 }
 
+
+float Motor::getCurPos()
+{
+	return CurPos;
+}
+void Motor::setCurPos(float p)
+{
+	CurPos = p;
+}
+
+
+//Calibrate
+
+
+
+bool Motor::getCalibratedFlag()
+{
+	return calibrated;
+}
+void Motor::setCalibratedFlag(bool c)
+{
+	calibrated = c;
+}
+
+
+void  Motor::calcStepCmRetio(int um)
+{
+	minStepCmMRetio = stepMin/um;
+	maxStepCmMRetio = stepMax/um;
+}
+
+int Motor::calculateMove(float newPos)
+{
+	if(CurPos > newPos)
+	{
+		DIR->write(true);
+
+		return round(((CurPos - newPos) * minStepCmMRetio));
+
+	}
+	else if(CurPos < newPos)
+	{
+		DIR->write(false);
+		return round(((newPos - CurPos) * maxStepCmMRetio));
+	}
+	else
+	{
+		STEP->write(false);
+	}
+	return 0;
+}
+
+
+
 void Motor::calibration() {
 	int hitCount = 0;
+
+	char ch[200] = {0};
 
 	while(!calibrated) {
 
 		if(hitCount >3 && !calibrated)
 		{
 
-			Board_UARTPutSTR("\r\nI reached the end !!! ");
+			Board_UARTPutSTR("\r\nI reached the end !!!\r\n");
+			sprintf(ch,"Margin Min: %d,\tMargin Max: %d,\tStep Min: %d,\t Step Max: %d\r\n\r\n", marginMin, marginMax, stepMin, stepMax);
+			Board_UARTPutSTR(ch);
 
 			switch(moveType)
 			{
@@ -200,6 +264,7 @@ void Motor::calibration() {
 			hitCount++;
 			if(LimitSWMin->read())
 			{
+				//vTaskDelay(DLY5SEC);
 				moveType = mLeft;
 
 				Board_UARTPutSTR("\r\nLimit Min Hit");
@@ -217,6 +282,7 @@ void Motor::calibration() {
 			}
 			else if(LimitSWMax->read())
 			{
+				//vTaskDelay(DLY5SEC);
 				moveType = mRight;
 				Board_UARTPutSTR("\r\nLimit Max Hit");
 				if(hitCount >1)

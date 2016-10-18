@@ -19,7 +19,7 @@
 #define DLY5MS (5/portTICK_PERIOD_MS)
 #define DLY1SEC (1000/portTICK_PERIOD_MS)
 #define DLY5SEC (5000/portTICK_PERIOD_MS)
-
+#define TICK_RATE 1000000
 
 //NEW MACROS
 

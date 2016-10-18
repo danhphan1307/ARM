@@ -21,7 +21,7 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin*
 	stepCount = 0;
 	Maxstepnum = 0;
 	CurPos = 0;
-	pps = 2000;
+	pps = 400;
 
 	minStepCmMRetio = 0.0;
 	maxStepCmMRetio = 0.0;
@@ -261,10 +261,10 @@ void Motor::calibration() {
 			hitCount++;
 			if(LimitSWMin->read())
 			{
-				//vTaskDelay(DLY5SEC);
+
 				moveType = mLeft;
 
-				Board_UARTPutSTR("\r\nLimit Min Hit");
+				//Board_UARTPutSTR("\r\nLimit Min Hit");
 				if(hitCount >1)
 				{
 					stepMin= stepCount;
@@ -279,9 +279,9 @@ void Motor::calibration() {
 			}
 			else if(LimitSWMax->read())
 			{
-				//vTaskDelay(DLY5SEC);
+
 				moveType = mRight;
-				Board_UARTPutSTR("\r\nLimit Max Hit");
+				//Board_UARTPutSTR("\r\nLimit Max Hit");
 				if(hitCount >1)
 				{
 					stepMax= stepCount;
@@ -294,10 +294,6 @@ void Motor::calibration() {
 				marginMax= stepCount;
 			}
 			resetStepNum();
-
-
-
-
 		}
 
 		stop();

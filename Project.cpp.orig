@@ -52,6 +52,13 @@ static DigitalIoPin* LimitSWYMax;
 static Motor*  MX;
 static Motor*  MY;
 
+<<<<<<< HEAD
+volatile uint32_t RIT_count;
+xSemaphoreHandle sbRIT = xSemaphoreCreateBinary();
+
+
+=======
+>>>>>>> Motor
 
 static void prvSetupHardware(void)
 {
@@ -60,7 +67,10 @@ static void prvSetupHardware(void)
 
 	/* Initial LED0 state is off */
 	Board_LED_Set(0, false);
+<<<<<<< HEAD
+=======
 
+>>>>>>> Motor
 }
 
 
@@ -70,9 +80,12 @@ static void vTask1(void *pvParameters) {
 	MX->calibration();
 	MY->calibration();
 
+<<<<<<< HEAD
+=======
 	MX->calcStepCmRetio(xLength);
 	MY->calcStepCmRetio(yLength);
 
+>>>>>>> Motor
 
 }
 

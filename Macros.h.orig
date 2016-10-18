@@ -18,7 +18,10 @@
 #define DLY20MS (20/portTICK_PERIOD_MS)
 #define DLY5MS (5/portTICK_PERIOD_MS)
 #define DLY1SEC (1000/portTICK_PERIOD_MS)
+<<<<<<< HEAD
+=======
 #define DLY5SEC (5000/portTICK_PERIOD_MS)
+>>>>>>> Motor
 
 
 //NEW MACROS
@@ -42,9 +45,15 @@
 
 //A3 layout (297X420)
 //A4 layout (210X297)
+<<<<<<< HEAD
+//calculated in mm
+#define xLength 347
+#define yLength 310
+=======
 //calculated in 10 micro meters (um)
 #define xLength 34700
 #define yLength 31000
+>>>>>>> Motor
 
 //the actual max is
 

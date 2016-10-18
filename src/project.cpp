@@ -43,11 +43,12 @@
 #include <string.h>
 #include "Macros.h"
 #include "Motor.h"
+
 Syslog* syslog = new Syslog();
-
+SemaphoreHandle_t calibrateSemaphore = xSemaphoreCreateBinary();
 QueueHandle_t xQueue = xQueueCreate(50,sizeof(CommandStruct));
-
-
+enum RIT_TYPE  {CALIBRATE, RUN}; // rit running type
+RIT_TYPE RIT_type;
 //MOTOR X
 static DigitalIoPin* STEPX;
 static DigitalIoPin* DIRX;
@@ -77,31 +78,102 @@ static void prvSetupHardware(void)
 	SystemCoreClockUpdate();
 	Board_Init();
 	Board_LED_Set(0, false);
+	//Init RIT
+	Chip_RIT_Init(LPC_RITIMER);
+	// set the priority level of the interrupt
+	// The level must be equal or lower than the maximum priority specified in FreeRTOS config
+	// Note that in a Cortex-M3 a higher number indicates lower interrupt priority
+	NVIC_SetPriority( RITIMER_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 1 );
+}
+
+
+extern "C" {
+void RIT_IRQHandler(void)
+{
+	// This used to check if a context switch is required
+	portBASE_TYPE xHigherPriorityWoken = pdFALSE;
+	// Tell timer that we have processed the interrupt.
+	// Timer then removes the IRQ until next match occurs
+	Chip_RIT_ClearIntStatus(LPC_RITIMER); // clear IRQ flag
+
+	uint64_t cmp_value;
+
+
+	Chip_RIT_Disable(LPC_RITIMER); // disable timer
+	// Give semaphore and set context switch flag if a higher priority task was woken up
+	xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
+
+
+	// End the ISR and (possibly) do a context switch
+	portEND_SWITCHING_ISR(xHigherPriorityWoken);
+}
+}
+
+//The following function sets up RIT interrupt at given interval
+//and waits until count RIT interrupts have occurred.
+//Note that the actual counting is performed by the ISR and this function just waits on the semaphore.
+
+void RIT_start(int count, int us, RIT_TYPE type)
+{
+	uint64_t cmp_value;
+
+	cmp_value = (uint64_t) Chip_Clock_GetSystemClockRate() * (uint64_t) us / 1000000;
+
+	Chip_RIT_Disable(LPC_RITIMER);
+	RIT_count = count;
+	RIT_type = type;
+	Chip_RIT_EnableCompClear(LPC_RITIMER);
+	Chip_RIT_SetCounter(LPC_RITIMER, 0);
+	Chip_RIT_SetCompareValue(LPC_RITIMER, cmp_value);
+	Chip_RIT_Enable(LPC_RITIMER);
+	NVIC_EnableIRQ(RITIMER_IRQn);
+	if(xSemaphoreTake(sbRIT, portMAX_DELAY) == pdTRUE) {
+		NVIC_DisableIRQ(RITIMER_IRQn);
+	}
+	else {
+		// unexpected error
+	}
 }
 
 
 static void calibrateTask(void *pvParameters) {
-	MX->calibration();
-	MY->calibration();
 
-	MX->calcStepCmRetio(xLength);
-	MY->calcStepCmRetio(yLength);
+	if (xSemaphoreTake(pvParameters,DLY20MS) == pdTRUE){
+
+	}
+
+	while (1) {
+		MX->calibration();
+		MY->calibration();
+
+		MX->calcStepCmRetio(xLength);
+		MY->calcStepCmRetio(yLength);
+
+		if (MX->getCalibratedFlag() && MY->getCalibratedFlag()){
+			xSemaphoreGive(calibrateSemaphore);
+		}
+	}
+
 }
 
 static void readCommand(void* param){
 	Syslog* guard = (Syslog*)param;
 	while(1){
-		guard->getCommand(xQueue);
-
+		if (xSemaphoreTake(calibrateSemaphore,(TickType_t) 10) == pdTRUE){
+			guard->getCommand(xQueue);
+		}
 	}
 }
+
 static void readQueue(void* param){
 	Servo pencil(0,10,160,90);
 	CommandStruct commandToQueue;
 	while(1){
-		if (xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
-			if (commandToQueue.type ==SERVOR){
-				pencil.Degree(commandToQueue.degreeServo);
+		if (xSemaphoreTake(calibrateSemaphore,(TickType_t) 10) == pdTRUE){
+			if (xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
+				if (commandToQueue.type ==SERVOR){
+					pencil.Degree(commandToQueue.degreeServo);
+				}
 			}
 		}
 	}
@@ -141,7 +213,7 @@ int main(void)
 			(TaskHandle_t *) NULL);
 
 	xTaskCreate(calibrateTask, "calibrateTask",
-			configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 1UL),
+			configMINIMAL_STACK_SIZE, sbRIT, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
 
 

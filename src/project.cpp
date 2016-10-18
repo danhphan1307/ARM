@@ -69,6 +69,8 @@ static DigitalIoPin* LimitSWYMax;
 static Motor*  MX;
 static Motor*  MY;
 
+Motor* mInUse;
+
 volatile uint32_t RIT_count;
 xSemaphoreHandle sbRIT = xSemaphoreCreateBinary();
 
@@ -95,15 +97,25 @@ void RIT_IRQHandler(void)
 	// Tell timer that we have processed the interrupt.
 	// Timer then removes the IRQ until next match occurs
 	Chip_RIT_ClearIntStatus(LPC_RITIMER); // clear IRQ flag
+	switch (RIT_type){
+	case CALIBRATE:
+		if (MX->getCalibratedFlag()==false){
+			MX->calibration();
+		}
+		else if (MY->getCalibratedFlag()==false){
+			MY->calibration();
+		}
+		else {
+			//distanceRatio = stepper.getCountstep()/10;
+			Chip_RIT_Disable(LPC_RITIMER); // disable timer
+			// Give semaphore and set context switch flag if a higher priority task was woken up
+			xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
+		}
+		break;
+	case RUN:
+		break;
 
-	uint64_t cmp_value;
-
-
-	Chip_RIT_Disable(LPC_RITIMER); // disable timer
-	// Give semaphore and set context switch flag if a higher priority task was woken up
-	xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
-
-
+	}
 	// End the ISR and (possibly) do a context switch
 	portEND_SWITCHING_ISR(xHigherPriorityWoken);
 }
@@ -141,21 +153,13 @@ static void calibrateTask(void *pvParameters) {
 	if (xSemaphoreTake(pvParameters,DLY20MS) == pdTRUE){
 
 	}
-
-	while (1) {
-		MX->calibration();
-		MY->calibration();
-
-		MX->calcStepCmRetio(xLength);
-		MY->calcStepCmRetio(yLength);
-
-		if (MX->getCalibratedFlag() && MY->getCalibratedFlag()){
-			xSemaphoreGive(calibrateSemaphore);
+	while(1){
+		if (MX->getCalibratedFlag()==false){
+			//A very large number of step to get it moving
+			RIT_start(10000,TICK_RATE/MX->getpps(),CALIBRATE);
 		}
 	}
-
 }
-
 static void readCommand(void* param){
 	Syslog* guard = (Syslog*)param;
 	while(1){

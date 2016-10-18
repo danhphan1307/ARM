@@ -63,6 +63,9 @@ public:
 	void setDir(bool d);
 	bool getDir();
 
+	void setAllow(bool d);
+	bool getAllow();
+
 
 	//void move(int newPos);
 	void move();
@@ -99,6 +102,7 @@ public:
 	moveDirType getMoveType();
 
 private:
+	int touchCount;
 	int stepCount;
 
 	//bool dir;
@@ -135,5 +139,17 @@ private:
 	DigitalIoPin* LimitSWMin;
 	DigitalIoPin* LimitSWMax;
 
-
+	bool pulse = true;
+	//Flag to signal that semaphore can be released
+	bool releaseSemaphoreFlag;
+	//Flag to allow execution , running motor in this case
+	bool allowExecutionFlag;
+	//Flag to signal that motor is in calibrating stage
+	bool calibrateFlag;
+	int step;
+	bool dir; //direction
+	int countstep; //step between 2 switches
+	//Var for calibrating
+	bool status;
+	int tempCountStep;
 };

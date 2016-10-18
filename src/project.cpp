@@ -83,6 +83,9 @@ static void prvSetupHardware(void)
 static void calibrateTask(void *pvParameters) {
 	MX->calibration();
 	MY->calibration();
+
+	MX->calcStepCmRetio(xLength);
+	MY->calcStepCmRetio(yLength);
 }
 
 static void readCommand(void* param){
@@ -129,6 +132,7 @@ int main(void)
 	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax);
 	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax);
 
+	syslog->InitMap();
 	xTaskCreate(readCommand, "readCommand",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
@@ -140,7 +144,8 @@ int main(void)
 			configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
 
-	syslog->InitMap();
+
+	MX->stop();
 	/* Start the scheduler */
 	vTaskStartScheduler();
 

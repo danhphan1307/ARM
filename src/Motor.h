@@ -12,7 +12,7 @@
 #include "DigitalIoPin.h"
 #include "FreeRTOS.h"
 #include "task.h"
-
+#include "semphr.h"
 
 #endif /* MOTOR_H_ */
 
@@ -52,6 +52,8 @@ public:
 	void setMarginMax(int m);
 
 	void calibration();
+	bool getCalibratedFlag();
+	void setCalibratedFlag(bool c);
 
 	//End calibration functions
 
@@ -64,7 +66,9 @@ public:
 
 	//void move(int newPos);
 	void move();
-	int calculateMove(int newPos);
+	int calculateMove(float newPos);
+
+	void calcStepCmRetio(int cm);
 
 
 	void stop();
@@ -80,6 +84,9 @@ public:
 	void setReleseFlag(bool b);
 	 */
 
+
+	float getCurPos();
+	void setCurPos(float p);
 
 	bool getAllowFlag();
 	void setAllowFlag(bool b);
@@ -110,10 +117,14 @@ private:
 
 	moveDirType moveType;
 
-	int CurPos;
+	float CurPos;
 
 	int stepMin;
 	int stepMax;
+
+
+	float minStepCmMRetio;
+	float maxStepCmMRetio;
 
 	int marginMin;
 	int marginMax;
@@ -126,5 +137,3 @@ private:
 
 
 };
-
-

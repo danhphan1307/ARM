@@ -21,11 +21,13 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin*
 	stepCount = 0;
 	Maxstepnum = 0;
 	CurPos = 0;
-	pps = 400;
+	pps = 3000;
 
 	minStepCmMRetio = 0.0;
 	maxStepCmMRetio = 0.0;
 	DIR->write(false);
+
+	 touchCount=0;
 
 }
 
@@ -62,10 +64,8 @@ void Motor::reverse()
 void Motor::move()
 {
 	STEP->write(true);
-	vTaskDelay(DLY1MS);
 	stepCount++;
 	STEP->write(false);
-
 }
 
 
@@ -220,85 +220,56 @@ void Motor::calibration() {
 	int hitCount = 0;
 
 	char ch[200] = {0};
+	if (touchCount==2){
+		move();
+		tempCountStep--;
 
-	while(!calibrated) {
-
-		if(hitCount >3 && !calibrated)
+		//Turn on flag to notify ISR that calibration is finished
+		if ( (status && LimitSWMin->read())|| (!status &&LimitSWMax->read()) )
 		{
+			dir = !dir;
+			DIR->write(dir);
+			STEP->write(false);
 
-			Board_UARTPutSTR("\r\nI reached the end !!!\r\n");
-			sprintf(ch,"Margin Min: %d,\tMargin Max: %d,\tStep Min: %d,\t Step Max: %d\r\n\r\n", marginMin, marginMax, stepMin, stepMax);
-			Board_UARTPutSTR(ch);
-
-			switch(moveType)
-			{
-			case mLeft:
-				while(stepCount < 100*marginMax)
-				{
-					move();
-				}
-				break;
-			case mRight:
-				while(stepCount < 100*marginMin)
-				{
-					move();
-				}
-				break;
+			//Turn on second time hit flag
+			//Return if 2nd run error offset is ok ( +-3 steps offset )
+			if (tempCountStep < 3 && tempCountStep > -3){
+				calibrated = true;
+			} else {
+				//Reset calibration if condition is not met
+				countstep =0;
+				touchCount=0;
 			}
-
-			calibrated = true;
-			stop();
-
 		}
-		else if((!LimitSWMin->read() && !LimitSWMax->read()) && !calibrated) {
-
+	} else{
+		//If motor hits switch (first time)
+		if (touchCount==1){
+			dir = status ? false : true; //revert direction (hit left sw -> run right, hit right sw, run lefT)
+			DIR->write(dir);
 			move();
-		}
-		else if(!calibrated)
-		{
-
-			reverse();
-			hitCount++;
-			if(LimitSWMin->read())
-			{
-
-				moveType = mLeft;
-
-				//Board_UARTPutSTR("\r\nLimit Min Hit");
-				if(hitCount >1)
-				{
-					stepMin= stepCount;
-				}
-
-				resetStepNum();
-				while(LimitSWMin->read())
-				{
-					move();
-				}
-				marginMin= stepCount;
+			countstep++;
+			//Check if motor hit switch for the second time
+			if ( (status && LimitSWMin->read())
+					|| (!status &&LimitSWMax->read()) ){
+				dir = !dir;
+				DIR->write(dir);
+				stop();
+				//Turn on second time hit flag
+				tempCountStep = countstep; //store countstep into a temp for later evaluation
+				touchCount++;
+				status=LimitSWMax->read();
+				return;
 			}
-			else if(LimitSWMax->read())
-			{
-
-				moveType = mRight;
-				//Board_UARTPutSTR("\r\nLimit Max Hit");
-				if(hitCount >1)
-				{
-					stepMax= stepCount;
-				}
-				resetStepNum();
-				while(LimitSWMax->read())
-				{
-					move();
-				}
-				marginMax= stepCount;
+		} else {
+			//If motor has not hit switch, then just run
+			if (!LimitSWMax->read() && !LimitSWMin->read()){
+				move();
+			} else {
+				//Turn off first time sprint if switch is hit
+				stop();
+				status = LimitSWMax->read();
+				touchCount++;
 			}
-			resetStepNum();
 		}
-
-		stop();
-
-
 	}
-
 }

@@ -41,7 +41,7 @@ C_DEPS += \
 freertos/src/%.o: ../freertos/src/%.c
 	@echo 'Building file: $<'
 	@echo 'Invoking: MCU C Compiler'
-	arm-none-eabi-gcc -D__NEWLIB__ -DDEBUG -D__CODE_RED -DCORE_M3 -D__USE_LPCOPEN -DCPP_USE_HEAP -D__LPC15XX__ -I"/Users/danh/Documents/LPCXpresso_8.2.2/workspace/lpc_board_nxp_lpcxpresso_1549/inc" -I"/Users/danh/Documents/LPCXpresso_8.2.2/workspace/lpc_chip_15xx/inc" -I"/Users/danh/Documents/LPCXpresso_8.2.2/workspace/rgb_led/src" -I"/Users/danh/Documents/LPCXpresso_8.2.2/workspace/rgb_led/freertos/inc" -O0 -fno-common -g3 -Wall -c -fmessage-length=0 -fno-builtin -ffunction-sections -fdata-sections -mcpu=cortex-m3 -mthumb -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	arm-none-eabi-gcc -D__NEWLIB__ -DDEBUG -D__CODE_RED -DCORE_M3 -D__USE_LPCOPEN -DCPP_USE_HEAP -D__LPC15XX__ -I"/Users/nguyenluong/Documents/LPCXpresso_8.2.2/workspace/lpc_board_nxp_lpcxpresso_1549/inc" -I"/Users/nguyenluong/Documents/LPCXpresso_8.2.2/workspace/lpc_chip_15xx/inc" -I"/Users/nguyenluong/git/ARM/src" -I"/Users/nguyenluong/git/ARM/freertos/inc" -O0 -fno-common -g3 -Wall -c -fmessage-length=0 -fno-builtin -ffunction-sections -fdata-sections -mcpu=cortex-m3 -mthumb -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.o)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

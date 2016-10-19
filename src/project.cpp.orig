@@ -48,8 +48,12 @@
 Syslog* syslog = new Syslog();
 SemaphoreHandle_t calibrateSemaphore = xSemaphoreCreateBinary();
 QueueHandle_t xQueue = xQueueCreate(50,sizeof(CommandStruct));
+<<<<<<< HEAD
 enum RIT_TYPE  {CALIBRATE, RUN}; // rit running type
 RIT_TYPE RIT_type;
+=======
+
+>>>>>>> origin/master
 //MOTOR X
 static DigitalIoPin* STEPX;
 static DigitalIoPin* DIRX;
@@ -69,6 +73,8 @@ static DigitalIoPin* LimitSWYMax;
 
 static Motor*  MX;
 static Motor*  MY;
+
+Motor* mInUse;
 
 volatile uint32_t RIT_count;
 xSemaphoreHandle sbRIT = xSemaphoreCreateBinary();
@@ -146,6 +152,7 @@ void RIT_start(int count, int us, RIT_TYPE type)
 	}
 }
 
+<<<<<<< HEAD
 
 static void calibrateTask(void *pvParameters) {
 
@@ -159,8 +166,9 @@ static void calibrateTask(void *pvParameters) {
 		}
 	}
 }
-
+=======
 //This task read command from UART and put it to the Queue
+>>>>>>> origin/master
 static void readCommand(void* param){
 	Syslog* guard = (Syslog*)param;
 	while(1){
@@ -170,10 +178,13 @@ static void readCommand(void* param){
 	}
 }
 
+<<<<<<< HEAD
+=======
 /*This task wait for the semaphore, take it if it is free.
 Then it will read command from the Queue and execute the command and release the semaphore.
  */
 
+>>>>>>> origin/master
 static void readQueue(void* param){
 	Servo pencil(0,10);
 	Laser laser(0,12);
@@ -181,6 +192,13 @@ static void readQueue(void* param){
 	CommandStruct commandToQueue;
 
 	while(1){
+<<<<<<< HEAD
+		if (xSemaphoreTake(calibrateSemaphore,(TickType_t) 10) == pdTRUE){
+			if (xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
+				if (commandToQueue.type ==SERVOR){
+					pencil.Degree(commandToQueue.degreeServo);
+				}
+=======
 		if (xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
 			if (commandToQueue.type ==SERVOR){
 				pencil.Degree(commandToQueue.degreeServo);
@@ -190,6 +208,7 @@ static void readQueue(void* param){
 				guard->write("OK\r\n");
 			}else if (commandToQueue.type ==BOTH_STEPPER){
 				guard->write("OK\r\n");
+>>>>>>> origin/master
 			}
 		}
 	}
@@ -228,13 +247,18 @@ int main(void)
 	xTaskCreate(readQueue, "readQueue",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-
+	/*
 	xTaskCreate(calibrateTask, "calibrateTask",
 			configMINIMAL_STACK_SIZE, sbRIT, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
+<<<<<<< HEAD
 
 
 	MX->stop();
+=======
+	 */
+	syslog->InitMap();
+>>>>>>> origin/master
 	/* Start the scheduler */
 	vTaskStartScheduler();
 

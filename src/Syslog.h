@@ -16,13 +16,14 @@
 #include "Macros.h"
 using namespace std;
 
-enum MotorCommandType	{BOTH_STEPPER, SERVOR};
+enum MotorCommandType	{BOTH_STEPPER, SERVOR, LASER};
 
 struct CommandStruct {
 	MotorCommandType type;
 	float geoX;
 	float geoY;
 	float degreeServo;
+	int power;
 };
 
 /* Sets up system hardware */
@@ -114,9 +115,9 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				int t = my_map.find(str)->second;
 				switch(t){
 				case 1 :
-					Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
 					//M10
 					//Go home and start drawing.
+					Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
 
 					break;
 				case 2:
@@ -135,6 +136,7 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 							p++;
 						}
 					}
+
 					//degree will be load to iDegree. Use this for the pencil
 					commandToQueue.type= SERVOR;
 					commandToQueue.degreeServo= iDegree;
@@ -148,14 +150,19 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 					//laser
 				{
 					char  *p = command;
-					int iDegree;
+					int power;
 					while (*p) { // While there are more characters to process...
 						if (isdigit(*p)) { // Upon finding a digit, ...
-							iDegree = strtol(p, &p, 10); // Read a number, ..
+							power = strtol(p, &p, 10); // Read a number, ..
 						} else { // Otherwise, move on to the next character.
 							p++;
 						}
 					}
+					commandToQueue.type= LASER;
+					commandToQueue.power= power;
+					if (xQueueSend(xQueue,&commandToQueue,(TickType_t) 10)==pdTRUE){}
+
+
 					//degree will be load to iDegree. Use this for the laser
 					break;
 				}
@@ -242,8 +249,7 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				}
 				}
 
-				//Send back OK, reset the word_count and reset the command
-				Board_UARTPutSTR("OK\r\n");
+				//Reset the word_count and reset the command
 				word_count=0;
 				memset(command, 0, sizeof(command));
 			}

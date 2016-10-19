@@ -40,13 +40,13 @@
 //#include "Macro.h"
 #include "Syslog.h"
 #include "Servo.h"
+#include "Laser.h"
 #include <string.h>
 #include "Macros.h"
 #include "Motor.h"
 Syslog* syslog = new Syslog();
 
 QueueHandle_t xQueue = xQueueCreate(50,sizeof(CommandStruct));
-
 
 //MOTOR X
 static DigitalIoPin* STEPX;
@@ -85,6 +85,7 @@ static void calibrateTask(void *pvParameters) {
 	MY->calibration();
 }
 
+//This task read command from UART and put it to the Queue
 static void readCommand(void* param){
 	Syslog* guard = (Syslog*)param;
 	while(1){
@@ -92,13 +93,27 @@ static void readCommand(void* param){
 
 	}
 }
+
+/*This task wait for the semaphore, take it if it is free.
+Then it will read command from the Queue and execute the command and release the semaphore.
+ */
+
 static void readQueue(void* param){
-	Servo pencil(0,10,160,90);
+	Servo pencil(0,10);
+	Laser laser(0,12);
+	Syslog* guard = (Syslog*)param;
 	CommandStruct commandToQueue;
+
 	while(1){
 		if (xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
 			if (commandToQueue.type ==SERVOR){
 				pencil.Degree(commandToQueue.degreeServo);
+				guard->write("OK\r\n");
+			}else if (commandToQueue.type ==LASER){
+				laser.Power(commandToQueue.power);
+				guard->write("OK\r\n");
+			}else if (commandToQueue.type ==BOTH_STEPPER){
+				guard->write("OK\r\n");
 			}
 		}
 	}
@@ -132,14 +147,15 @@ int main(void)
 	xTaskCreate(readCommand, "readCommand",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
+
 	xTaskCreate(readQueue, "readQueue",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-
+	/*
 	xTaskCreate(calibrateTask, "calibrateTask",
 			configMINIMAL_STACK_SIZE, NULL, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-
+	 */
 	syslog->InitMap();
 	/* Start the scheduler */
 	vTaskStartScheduler();

@@ -5,6 +5,7 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../src/DigitalIoPin.cpp \
+../src/Laser.cpp \
 ../src/Motor.cpp \
 ../src/Servo.cpp \
 ../src/cr_cpp_config.cpp \
@@ -17,6 +18,7 @@ C_SRCS += \
 
 OBJS += \
 ./src/DigitalIoPin.o \
+./src/Laser.o \
 ./src/Motor.o \
 ./src/Servo.o \
 ./src/cr_cpp_config.o \
@@ -27,6 +29,7 @@ OBJS += \
 
 CPP_DEPS += \
 ./src/DigitalIoPin.d \
+./src/Laser.d \
 ./src/Motor.d \
 ./src/Servo.d \
 ./src/cr_cpp_config.d \

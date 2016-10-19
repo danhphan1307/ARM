@@ -4,19 +4,16 @@
 #include "FreeRTOS.h"
 #include "../freertos/inc/semphr.h"
 
-#ifndef Servo_h
-#define Servo_h
+#ifndef Laser_h
+#define Laser_h
 
-class Servo
+class Laser
 {
 public:
-	Servo(int pin,int port);
-	void Degree(int degree);
-
+	Laser(int pin,int port);
+	void Power(int power);
 private:
 	int pin;
 	int port;
-	int pendown;
-	int penup;
 };
 #endif

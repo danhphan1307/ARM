@@ -27,8 +27,6 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin*
 	maxStepCmMRetio = 0.0;
 	DIR->write(false);
 
-	 touchCount=0;
-
 }
 
 
@@ -216,6 +214,8 @@ int Motor::calculateMove(float newPos)
 
 
 
+/*
+
 void Motor::calibration() {
 	int hitCount = 0;
 
@@ -249,8 +249,7 @@ void Motor::calibration() {
 			move();
 			countstep++;
 			//Check if motor hit switch for the second time
-			if ( (status && LimitSWMin->read())
-					|| (!status &&LimitSWMax->read()) ){
+			if ( (status && LimitSWMin->read())|| (!status &&LimitSWMax->read()) ){
 				dir = !dir;
 				DIR->write(dir);
 				stop();
@@ -273,3 +272,82 @@ void Motor::calibration() {
 		}
 	}
 }
+
+*/
+void Motor::calibration() {
+	int hitCount = 0;
+
+	char ch[200] = {0};
+
+	if(!calibrated) {
+
+		if(hitCount >3 && !calibrated)
+		{
+			Board_UARTPutSTR("\r\nI reached the end !!!\r\n");
+			sprintf(ch,"Margin Min: %d,\tMargin Max: %d,\tStep Min: %d,\t Step Max: %d\r\n\r\n", marginMin, marginMax, stepMin, stepMax);
+			Board_UARTPutSTR(ch);
+			switch(moveType)
+			{
+			case mLeft:
+				if(stepCount < 100*marginMax)
+				{
+					move();
+				}
+				break;
+			case mRight:
+				if(stepCount < 100*marginMin)
+				{
+					move();
+				}
+				break;
+			}
+			calibrated = true;
+			stop();
+		}
+		else if((!LimitSWMin->read() && !LimitSWMax->read()) && !calibrated) {
+			move();
+		}
+		else if(!calibrated)
+		{
+			reverse();
+			hitCount++;
+			if(LimitSWMin->read())
+			{
+				//vTaskDelay(DLY5SEC);
+				moveType = mLeft;
+				Board_UARTPutSTR("\r\nLimit Min Hit");
+				if(hitCount >1)
+				{
+					stepMin= stepCount;
+				}
+				resetStepNum();
+				if(LimitSWMin->read())
+				{
+					move();
+				}
+				marginMin= stepCount;
+			}
+			else if(LimitSWMax->read())
+			{
+				//vTaskDelay(DLY5SEC);
+				moveType = mRight;
+				Board_UARTPutSTR("\r\nLimit Max Hit");
+				if(hitCount >1)
+				{
+					stepMax= stepCount;
+				}
+				resetStepNum();
+				if(LimitSWMax->read())
+				{
+					move();
+				}
+				marginMax= stepCount;
+			}
+			resetStepNum();
+		}
+
+		stop();
+	}
+
+}
+

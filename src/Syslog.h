@@ -39,12 +39,14 @@ public:
 	void InitMap();
 private:
 	SemaphoreHandle_t syslogMutex;
-	int word_count = 0;
-	char command[100] ="";
+	int word_count ;
+	char command[100] ;
 	map<string, int> my_map;
 };
 
 Syslog::Syslog() {
+	command[0] = '\0';
+	word_count = 0;
 	syslogMutex = xSemaphoreCreateMutex();
 }
 Syslog::~Syslog() {

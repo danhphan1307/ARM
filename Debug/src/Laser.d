@@ -1,4 +1,4 @@
-src/Servo.o src/Servo.d: ../src/Servo.cpp ../src/Servo.h \
+src/Laser.o src/Laser.d: ../src/Laser.cpp ../src/Laser.h \
  /Users/danh/Documents/LPCXpresso_8.2.2/workspace/lpc_chip_15xx/inc/chip.h \
  /Users/danh/Documents/LPCXpresso_8.2.2/workspace/lpc_chip_15xx/inc/lpc_types.h \
  /Users/danh/Documents/LPCXpresso_8.2.2/workspace/lpc_chip_15xx/inc/sys_config.h \
@@ -58,7 +58,7 @@ src/Servo.o src/Servo.d: ../src/Servo.cpp ../src/Servo.h \
  /Users/danh/Documents/LPCXpresso_8.2.2/workspace/Project/freertos/inc/mpu_wrappers.h \
  ../src/../freertos/inc/semphr.h ../src/../freertos/inc/queue.h
 
-../src/Servo.h:
+../src/Laser.h:
 
 /Users/danh/Documents/LPCXpresso_8.2.2/workspace/lpc_chip_15xx/inc/chip.h:
 

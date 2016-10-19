@@ -60,7 +60,7 @@ src/project.o src/project.d: ../src/project.cpp \
  /Users/danh/Documents/LPCXpresso_8.2.2/workspace/Project/freertos/inc/list.h \
  ../src/DigitalIoPin.h ../src/../freertos/inc/semphr.h \
  ../src/../freertos/inc/queue.h ../src/Syslog.h ../src/Macros.h \
- ../src/Servo.h ../src/Motor.h
+ ../src/Servo.h ../src/Laser.h ../src/Motor.h
 
 /Users/danh/Documents/LPCXpresso_8.2.2/workspace/lpc_board_nxp_lpcxpresso_1549/inc/board.h:
 
@@ -191,5 +191,7 @@ src/project.o src/project.d: ../src/project.cpp \
 ../src/Macros.h:
 
 ../src/Servo.h:
+
+../src/Laser.h:
 
 ../src/Motor.h:

@@ -1,0 +1,51 @@
+Skip to content
+This repository
+Search
+Pull requests
+Issues
+Gist
+ @lnknguyen
+ Watch 1,845
+  Star 42,107
+  Fork 16,861 github/gitignore
+ Code  Pull requests 167  Projects 0  Pulse  Graphs
+Branch: master Find file Copy pathgitignore/C++.gitignore
+2c52d02  on Jun 29
+ pmartinez added prerequisites for C and C++
+8 contributors @malleor @jlokimlin @rhysd @peterfpeterson @bnoordhuis @d2s @mrtazz @starrify
+RawBlameHistory     
+33 lines (26 sloc)  270 Bytes
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+Contact GitHub API Training Shop Blog About
+© 2016 GitHub, Inc. Terms Privacy Security Status Help

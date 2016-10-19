@@ -5,12 +5,10 @@
 #define	LOWER_LIMIT	500
 
 
-Servo::Servo(int pin,int port, int pendown, int penup)
+Servo::Servo(int pin,int port)
 {
 	this->pin = pin;
 	this->port = port;
-	this->pendown = pendown;
-	this->penup = penup;
 
 	Chip_SCT_Init(LPC_SCT0);
 	Chip_SCTPWM_Init(LPC_SCT0);
@@ -37,8 +35,8 @@ Servo::Servo(int pin,int port, int pendown, int penup)
 }
 
 void Servo::Degree(int degree){
-	if(LPC_SCT0->MATCHREL[1].L < UPPER_LIMIT && LPC_SCT0->MATCHREL[1].L > LOWER_LIMIT){
-		LPC_SCT0->MATCHREL[1].L= (degree/0.06);
+	int temp = degree/0.06;
+	if(temp <= UPPER_LIMIT && temp >= LOWER_LIMIT){
+		LPC_SCT0->MATCHREL[1].L= temp;
 	}
-
 }

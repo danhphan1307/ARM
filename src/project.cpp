@@ -197,35 +197,31 @@ static void calibrateTask(void *pvParameters) {
 			RIT_start(c,TICK_RATE/600,RUN, MX);
 			//RIT_start(1,TICK_RATE/600,RUN, MY);
 		}
-		*/
+		 */
 	}
 }
-
-//This task read command from UART and put it to the Queue
-static void readCommand(void* param){
-	Syslog* guard = (Syslog*)param;
-	while(1){
-		guard->getCommand(xQueue);
-		vTaskDelay(DLY1MS);
-	}
-	/*
-	while(1){
-		if (xSemaphoreTake(calibrateSemaphore,(TickType_t) 10) == pdTRUE){
-			guard->getCommand(xQueue);
-		}
-	}
-	 */
-}
-
-/*This task wait for the semaphore, take it if it is free.
-Then it will read command from the Queue and execute the command and release the semaphore.
- */
 
 int psCalc(int step, int xpos, int ypos )
 {
 	return (step/(sqrt((xpos*xpos) + (ypos*ypos) ))) * DefPPS;
 }
 
+/*
+ *This task read command from UART and put it to the Queue
+ */
+static void readCommand(void* param){
+	Syslog* guard = (Syslog*)param;
+	while(1){
+		if ( xQueue != 0){
+			guard->getCommand(xQueue);
+			//vTaskDelay(DLY1MS);
+		}
+	}
+}
+
+/*
+ * This task will check if there is anything in the queue and then execute it.
+ */
 static void readQueue(void* param){
 	Servo pencil(0,10);
 	Laser laser(0,12);
@@ -233,7 +229,7 @@ static void readQueue(void* param){
 	CommandStruct commandToQueue;
 
 	while(1){
-		if (xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
+		if ( xQueue != 0  && xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
 			if (commandToQueue.type ==SERVOR){
 				pencil.Degree(commandToQueue.degreeServo);
 				guard->write("OK\r\n");
@@ -254,7 +250,7 @@ static void readQueue(void* param){
 
 			}
 		}
-		vTaskDelay(DLY1MS);
+		//vTaskDelay(DLY1MS);
 	}
 
 }
@@ -263,7 +259,8 @@ int main(void)
 {
 	prvSetupHardware();
 
-	//Setup motor
+	/* Set up motor*/
+
 	//MOTOR X
 	STEPX = new DigitalIoPin(7,DigitalIoPin::output);
 	DIRX = new DigitalIoPin(8,DigitalIoPin::output);
@@ -271,7 +268,6 @@ int main(void)
 	//Limit Swtch X
 	LimitSWXMin = new DigitalIoPin(3,DigitalIoPin::pullup,true);
 	LimitSWXMax = new DigitalIoPin(4,DigitalIoPin::pullup,true);
-
 
 	//MOTOR Y
 	STEPY = new DigitalIoPin(5,DigitalIoPin::output);
@@ -284,6 +280,8 @@ int main(void)
 	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax,347);
 	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax,310);
 
+	/* End of set up motor*/
+
 	syslog->InitMap();
 
 	xTaskCreate(readCommand, "readCommand",
@@ -293,11 +291,10 @@ int main(void)
 	xTaskCreate(readQueue, "readQueue",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-/*
+
 	xTaskCreate(calibrateTask, "calibrateTask",
 			configMINIMAL_STACK_SIZE, sbRIT, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-*/
 
 	/* Start the scheduler */
 	vTaskStartScheduler();

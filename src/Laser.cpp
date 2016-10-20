@@ -42,6 +42,6 @@ Laser::Laser(int pin,int port)
 void Laser::Power(int power){
 
 	if(power <= UPPER_LIMIT_LASER && power >= LOWER_LIMIT_LASER){
-		LPC_SCT1->MATCHREL[1].L = 255-power;
+		LPC_SCT1->MATCHREL[1].L = power;
 	}
 }

@@ -99,9 +99,14 @@ public:
 	//DOne
 	void setMoveType(moveDirType t);
 	moveDirType getMoveType();
+	float getCMRetio();
 
 	//Move by geo
 	void move(float geo);
+	float getCountStepToMmRatio() { return mmToStepRatio;}
+	bool isHit() {return LimitSWMax->read()||LimitSWMin->read();}
+	void stepUp() { STEP->write(true);}
+	void stepDown() { STEP->write(false);}
 private:
 	float lengthInMm;
 	int touchCount;

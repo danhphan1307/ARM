@@ -30,7 +30,7 @@ public:
 
 	//done
 	//Motor();
-	Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin* Lmax);
+	Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin* Lmax, float mmLength);
 	virtual ~Motor();
 
 	//Calibration functions
@@ -77,7 +77,6 @@ public:
 	void stop();
 	void reverse();
 
-
 	int getpps();
 	void setpps(int b);
 	//end movment functions
@@ -101,7 +100,10 @@ public:
 	void setMoveType(moveDirType t);
 	moveDirType getMoveType();
 
+	//Move by geo
+	void move(float geo);
 private:
+	float lengthInMm;
 	int touchCount;
 	int stepCount;
 
@@ -138,6 +140,8 @@ private:
 
 	DigitalIoPin* LimitSWMin;
 	DigitalIoPin* LimitSWMax;
+
+	float mmToStepRatio;
 
 	bool pulse = true;
 	//Flag to signal that semaphore can be released

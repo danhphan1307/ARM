@@ -41,6 +41,7 @@
 #define xLength 34700
 #define yLength 31000
 
+#define DefPPS 5000
 //the actual max is
 
 //327

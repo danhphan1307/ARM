@@ -8,7 +8,7 @@
 #include <math.h>
 
 
-Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin* Lmax)
+Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin* Lmax, float mmLength)
 {
 	calibrated = false;
 	STEP = S;
@@ -20,14 +20,16 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin*
 
 	stepCount = 0;
 	Maxstepnum = 0;
-	CurPos = 0;
-	pps = 3000;
+	CurPos = 0.0;
+	pps = 4000;
 
 	minStepCmMRetio = 0.0;
 	maxStepCmMRetio = 0.0;
 	DIR->write(false);
 
 	 touchCount=0;
+
+	 lengthInMm = mmLength;
 
 }
 
@@ -63,6 +65,9 @@ void Motor::reverse()
  */
 void Motor::move()
 {
+	if (!LimitSWMax->read() || !LimitSWMin->read()){
+		reverse();
+	}
 	STEP->write(true);
 	stepCount++;
 	STEP->write(false);
@@ -189,12 +194,13 @@ void Motor::setCalibratedFlag(bool c)
 
 void  Motor::calcStepCmRetio(int um)
 {
-	minStepCmMRetio = stepMin/um;
-	maxStepCmMRetio = stepMax/um;
+	minStepCmMRetio = countstep/um;
+	maxStepCmMRetio = countstep/um;
 }
 
 int Motor::calculateMove(float newPos)
 {
+	newPos *=100;
 	if(CurPos > newPos)
 	{
 		DIR->write(true);
@@ -210,8 +216,9 @@ int Motor::calculateMove(float newPos)
 	else
 	{
 		STEP->write(false);
+		return 0;
 	}
-	return 0;
+
 }
 
 
@@ -233,8 +240,9 @@ void Motor::calibration() {
 
 			//Turn on second time hit flag
 			//Return if 2nd run error offset is ok ( +-3 steps offset )
-			if (tempCountStep < 3 && tempCountStep > -3){
+			if (tempCountStep < 10 && tempCountStep > -10){
 				calibrated = true;
+				mmToStepRatio = (float)countstep / lengthInMm;
 			} else {
 				//Reset calibration if condition is not met
 				countstep =0;
@@ -273,3 +281,7 @@ void Motor::calibration() {
 		}
 	}
 }
+/*
+void Motor::move(float geo){
+
+}*/

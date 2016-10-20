@@ -1,4 +1,3 @@
-
 /*
  * @brief Blinky example using timers and sysTick
  *
@@ -29,7 +28,6 @@
  * copyright, permission, and disclaimer notice must appear in all copies of
  * this code.
  */
-
 #include "board.h"
 #include "board_api.h"
 #include "FreeRTOS.h"
@@ -44,43 +42,43 @@
 #include <string.h>
 #include "Macros.h"
 #include "Motor.h"
-
 Syslog* syslog = new Syslog();
 SemaphoreHandle_t calibrateSemaphore = xSemaphoreCreateBinary();
+SemaphoreHandle_t runningSemaphore = xSemaphoreCreateBinary();
+SemaphoreHandle_t motorXSemaphore = xSemaphoreCreateBinary();
+SemaphoreHandle_t motorYSemaphore = xSemaphoreCreateBinary();
 QueueHandle_t xQueue = xQueueCreate(50,sizeof(CommandStruct));
 enum RIT_TYPE  {CALIBRATE, RUN}; // rit running type
 RIT_TYPE RIT_type;
 Motor* mInUse;
-
+volatile int runningMotor = 0;
+bool doneRunning = false;
 struct StepCount{
 	int x;
 	int y;
+	StepCount(int _x, int _y){
+		x =_x;
+		y=_y;
+	}
 };
-
-StepCount countStruct ;
+volatile StepCount countStruct(0,0);
+volatile StepCount dataCountStruct(0,0);
 //MOTOR X
 static DigitalIoPin* STEPX;
 static DigitalIoPin* DIRX;
-
 //Limit Swtch X
 static DigitalIoPin* LimitSWXMin;
 static DigitalIoPin* LimitSWXMax;
-
-
 //MOTOR Y
 static DigitalIoPin* STEPY;
 static DigitalIoPin* DIRY;
-
 //Limit Swiches Y
 static DigitalIoPin* LimitSWYMin;
 static DigitalIoPin* LimitSWYMax;
-
 static Motor*  MX;
 static Motor*  MY;
-
 volatile uint32_t RIT_count;
 xSemaphoreHandle sbRIT = xSemaphoreCreateBinary();
-
 
 static void prvSetupHardware(void)
 {
@@ -94,8 +92,6 @@ static void prvSetupHardware(void)
 	// Note that in a Cortex-M3 a higher number indicates lower interrupt priority
 	NVIC_SetPriority( RITIMER_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 1 );
 }
-
-
 extern "C" {
 void RIT_IRQHandler(void)
 {
@@ -108,13 +104,13 @@ void RIT_IRQHandler(void)
 	case CALIBRATE:
 		if (MX->getCalibratedFlag()==false){
 			MX->calibration();
+			MX->calcStepCmRetio(xLength);
 		}
 		else if (MY->getCalibratedFlag()==false){
 			MY->calibration();
+			MY->calcStepCmRetio(yLength);
 		}
 		else {
-			MX->calcStepCmRetio(xLength);
-			MY->calcStepCmRetio(yLength);
 			//distanceRatio = stepper.getCountstep()/10;
 			Chip_RIT_Disable(LPC_RITIMER); // disable timer
 			// Give semaphore and set context switch flag if a higher priority task was woken up
@@ -122,24 +118,32 @@ void RIT_IRQHandler(void)
 		}
 		break;
 	case RUN:
-		if (countStruct.x > 0){
-			MX->move();
-			countStruct.x--;
-		}
-
-		if (countStruct.y > 0){
-			MY->move();
-			countStruct.y--;
-		}
-
-		if ((countStruct.x == 0 && countStruct.y == 0)||LimitSWXMax->read()||LimitSWXMin->read()){
+		/*
+		mInUse->move();
+		 */
+		if ((dataCountStruct.x <= 0 && dataCountStruct.y <= 0) || MX->isHit() || MY->isHit()){
+			doneRunning = true;
 			Chip_RIT_Disable(LPC_RITIMER); // disable timer
 			// Give semaphore and set context switch flag if a higher priority task was woken up
+			xSemaphoreGiveFromISR(runningSemaphore,&xHigherPriorityWoken);
 			xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
 		}
 
-		break;
+		if (runningMotor==0){
 
+			dataCountStruct.x--;
+			MX->move();
+			xSemaphoreGiveFromISR(sbRIT,&xHigherPriorityWoken);
+		}
+		if (runningMotor==1){
+			dataCountStruct.y--;
+			MY->move();
+			xSemaphoreGiveFromISR(sbRIT,&xHigherPriorityWoken);
+		}
+
+		//Chip_RIT_Disable(LPC_RITIMER); // disable timerx
+		xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
+		break;
 	}
 	// End the ISR and (possibly) do a context switch
 	portEND_SWITCHING_ISR(xHigherPriorityWoken);
@@ -149,17 +153,14 @@ void RIT_IRQHandler(void)
 //The following function sets up RIT interrupt at given interval
 //and waits until count RIT interrupts have occurred.
 //Note that the actual counting is performed by the ISR and this function just waits on the semaphore.
-
-void RIT_start(StepCount count, int us, RIT_TYPE type,Motor *m)
+void RIT_start(StepCount count, int us, RIT_TYPE type,int _runningMotor)
 {
-	countStruct = count;
-	mInUse = m;
+	//dataCountStruct.x = count.x;
+	//dataCountStruct.y = count.y
+	runningMotor = _runningMotor;
 	uint64_t cmp_value;
-
 	cmp_value = (uint64_t) Chip_Clock_GetSystemClockRate() * (uint64_t) us / 1000000;
-
 	Chip_RIT_Disable(LPC_RITIMER);
-
 	RIT_type = type;
 	Chip_RIT_EnableCompClear(LPC_RITIMER);
 	Chip_RIT_SetCounter(LPC_RITIMER, 0);
@@ -173,39 +174,24 @@ void RIT_start(StepCount count, int us, RIT_TYPE type,Motor *m)
 		// unexpected error
 	}
 }
-
-
 static void calibrateTask(void *pvParameters) {
-	StepCount c;
-	c.x = 0;
-	c.y= 0;
-	if (xSemaphoreTake(calibrateSemaphore,DLY1MS) == pdTRUE){
-
-	}
+	StepCount c(0,0);
+	SemaphoreHandle_t *calSem = (SemaphoreHandle_t*)pvParameters;
 	while(1){
-		c.x=500;
-		c.y=600;
-		RIT_start(c,TICK_RATE/800,RUN, MX);
-		/*
-		if (MX->getCalibratedFlag()==false){
-			//A very large number of step to get it moving
-
-			RIT_start(c,TICK_RATE/MX->getpps(),CALIBRATE,MX);
-		} else {
-			c.x=1000;
-			c.y=1200;
-			RIT_start(c,TICK_RATE/600,RUN, MX);
-			//RIT_start(1,TICK_RATE/600,RUN, MY);
+		if (xSemaphoreTake(calSem,DLY20MS)== pdTRUE){
+			if (MX->getCalibratedFlag()==false){
+				//A very large number of step to get it moving
+				RIT_start(c,TICK_RATE/MX->getpps(),CALIBRATE,0);
+			} else {
+				xSemaphoreGive(calSem);
+			}
 		}
-		 */
 	}
 }
-
-int psCalc(int step, int xpos, int ypos )
+int psCalc(int step, int deli )
 {
-	return (step/(sqrt((xpos*xpos) + (ypos*ypos) ))) * DefPPS;
+	return (step/(sqrt((step*step) + (deli*deli) ))) * DefPPS;
 }
-
 /*
  *This task read command from UART and put it to the Queue
  */
@@ -214,20 +200,19 @@ static void readCommand(void* param){
 	while(1){
 		if ( xQueue != 0){
 			guard->getCommand(xQueue);
-			//vTaskDelay(DLY1MS);
+			//
 		}
 	}
 }
-
 /*
  * This task will check if there is anything in the queue and then execute it.
  */
 static void readQueue(void* param){
+	float ratio = 87;
 	Servo pencil(0,10);
 	Laser laser(0,12);
 	Syslog* guard = (Syslog*)param;
 	CommandStruct commandToQueue;
-
 	while(1){
 		if ( xQueue != 0  && xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
 			if (commandToQueue.type ==SERVOR){
@@ -237,68 +222,88 @@ static void readQueue(void* param){
 				laser.Power(commandToQueue.power);
 				guard->write("OK\r\n");
 			}else if (commandToQueue.type ==BOTH_STEPPER){
-				int ppsx = psCalc(MX->calculateMove(commandToQueue.geoX), MX->calculateMove(commandToQueue.geoX), MY->calculateMove(commandToQueue.geoY));
-				int ppsy = psCalc(MY->calculateMove(commandToQueue.geoY), MX->calculateMove(commandToQueue.geoX), MY->calculateMove(commandToQueue.geoY));
-
-				while(MX->calculateMove(commandToQueue.geoX)!=0 && MY->calculateMove(commandToQueue.geoY) !=0)
-				{
-					//RIT_start(1,TICK_RATE/ppsx,RUN, MX);
-					//RIT_start(1,TICK_RATE/ppsy,RUN, MY);
+				int distanceX = (commandToQueue.geoX - countStruct.x)*ratio;
+				int distanceY = (commandToQueue.geoY - countStruct.y)*ratio;
+				countStruct.x = commandToQueue.geoX;//*MX->getCountStepToMmRatio();
+				countStruct.y = commandToQueue.geoY;//*MY->getCountStepToMmRatio();
+				//float tan = commandToQueue.geoX/commandToQueue.geoY;
+				int ppsX = psCalc(distanceX,distanceY);
+				int ppsY = psCalc(distanceY,distanceX);
+				StepCount c(distanceX,distanceY);
+				dataCountStruct.x = distanceX;
+				dataCountStruct.y = distanceY;
+				if (dataCountStruct.x <0) {
+					dataCountStruct.x *=-1;
+					MX->reverse();
+				}
+				if (dataCountStruct.y <0) {
+					dataCountStruct.y *=-1;
+					MY->reverse();
+				}
+				bool flag = false;
+				while (1){
+					if(xSemaphoreTake(runningSemaphore,DLY1MS)==pdTRUE){
+						break;
+					}
+					RIT_start(c,TICK_RATE/ppsX,RUN, 0);
+					RIT_start(c,TICK_RATE/ppsY,RUN, 1);
 				}
 				guard->write("OK\r\n");
-			}else {
-
 			}
 		}
-		//vTaskDelay(DLY1MS);
 	}
-
+}
+static void motorXTask(void* param){
+	while(1){
+		if (xSemaphoreTake(motorXSemaphore,DLY1MS)==pdTRUE){
+			MX->move();
+		}
+		vTaskDelay(DLY1MS);
+	}
+}
+static void motorYTask(void* param){
+	while(1){
+		if (xSemaphoreTake(motorYSemaphore,DLY1MS)==pdTRUE){
+			MY->move();
+		}
+		vTaskDelay(DLY1MS);
+	}
 }
 
 int main(void)
 {
 	prvSetupHardware();
-
 	/* Set up motor*/
-
 	//MOTOR X
 	STEPX = new DigitalIoPin(7,DigitalIoPin::output);
 	DIRX = new DigitalIoPin(8,DigitalIoPin::output);
-
 	//Limit Swtch X
 	LimitSWXMin = new DigitalIoPin(3,DigitalIoPin::pullup,true);
 	LimitSWXMax = new DigitalIoPin(4,DigitalIoPin::pullup,true);
-
 	//MOTOR Y
 	STEPY = new DigitalIoPin(5,DigitalIoPin::output);
 	DIRY = new DigitalIoPin(6,DigitalIoPin::output);
-
 	//Limit Swiches Y
 	LimitSWYMin = new DigitalIoPin(0,DigitalIoPin::pullup,true);
 	LimitSWYMax = new DigitalIoPin(1,DigitalIoPin::pullup,true);
-
 	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax,347);
 	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax,310);
-
 	/* End of set up motor*/
-
 	syslog->InitMap();
 
 	xTaskCreate(readCommand, "readCommand",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-
 	xTaskCreate(readQueue, "readQueue",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-
+	/*
 	xTaskCreate(calibrateTask, "calibrateTask",
-			configMINIMAL_STACK_SIZE, sbRIT, (tskIDLE_PRIORITY + 1UL),
+			configMINIMAL_STACK_SIZE, calibrateSemaphore, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-
+	 /*
 	/* Start the scheduler */
 	vTaskStartScheduler();
-
 	/* Should never arrive here */
 	return 1;
 }

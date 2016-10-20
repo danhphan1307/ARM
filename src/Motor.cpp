@@ -65,9 +65,7 @@ void Motor::reverse()
  */
 void Motor::move()
 {
-	if (!LimitSWMax->read() || !LimitSWMin->read()){
-		reverse();
-	}
+
 	STEP->write(true);
 	stepCount++;
 	STEP->write(false);

@@ -76,6 +76,7 @@ void Syslog::writeInt(int number){
 		xSemaphoreGive(syslogMutex);
 	}
 }
+
 void Syslog::writeFloat(float number){
 	if(xSemaphoreTake(syslogMutex, DLY20MS) == pdTRUE) {
 		char result[5];
@@ -101,7 +102,7 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 
 	if (num!=EOF){
 		command[word_count] = num;
-		//Board_UARTPutChar(num);
+		Board_UARTPutChar(num);
 		word_count++;
 
 		if(xSemaphoreTake(syslogMutex, DLY20MS) == pdTRUE) {
@@ -115,18 +116,14 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				int t = my_map.find(str)->second;
 				switch(t){
 				case 1 :
-					//M10
-					//Go home and start drawing.
+					//M10 - Send back to mDraw the info.
 					Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
-
 					break;
 				case 2:
-					//G28
-					// Do something ?
+					//G28- Do something ?
 					break;
 				case 3:{
-					//M1
-					//for the pencil
+					//M1 - Pencil task
 					char  *p = command;
 					int iDegree;
 					while (*p) { // While there are more characters to process...
@@ -146,29 +143,26 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				}
 
 				case 4:
-					//M4
-					//laser
+					//M4 - laser
 				{
 					char  *p = command;
-					int power;
+					int iPower;
 					while (*p) { // While there are more characters to process...
 						if (isdigit(*p)) { // Upon finding a digit, ...
-							power = strtol(p, &p, 10); // Read a number, ..
+							iPower = strtol(p, &p, 10); // Read a number, ..
 						} else { // Otherwise, move on to the next character.
 							p++;
 						}
 					}
 					commandToQueue.type= LASER;
-					commandToQueue.power= power;
+					commandToQueue.power= iPower;
 					if (xQueueSend(xQueue,&commandToQueue,(TickType_t) 10)==pdTRUE){}
 
-
-					//degree will be load to iDegree. Use this for the laser
+					//power of the laser will be load to iPower. Use this for the laser
 					break;
 				}
 				case 5:
-					//G1
-					//move the stepper according to X and Y
+					//G1 - Move the stepper according to X and Y
 				{
 					char* pch;
 					pch = strtok (command," ");
@@ -244,17 +238,15 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 					commandToQueue.geoY= geoY;
 					if (xQueueSend(xQueue,&commandToQueue,(TickType_t) 10)==pdTRUE){}
 
-
 					break;
 				}
 				}
 
 				//Reset the word_count and reset the command
-				//Board_UARTPutSTR("OK\r\n");
+				//Board_UARTPutSTR("OK\n");
 				word_count=0;
 				memset(command, 0, sizeof(command));
 			}
-
 			xSemaphoreGive(syslogMutex);
 		}
 	}

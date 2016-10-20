@@ -250,6 +250,7 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				}
 
 				//Reset the word_count and reset the command
+				//Board_UARTPutSTR("OK\r\n");
 				word_count=0;
 				memset(command, 0, sizeof(command));
 			}

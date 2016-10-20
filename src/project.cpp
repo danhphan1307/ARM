@@ -50,6 +50,14 @@ SemaphoreHandle_t calibrateSemaphore = xSemaphoreCreateBinary();
 QueueHandle_t xQueue = xQueueCreate(50,sizeof(CommandStruct));
 enum RIT_TYPE  {CALIBRATE, RUN}; // rit running type
 RIT_TYPE RIT_type;
+Motor* mInUse;
+
+struct StepCount{
+	int x;
+	int y;
+};
+
+StepCount countStruct ;
 //MOTOR X
 static DigitalIoPin* STEPX;
 static DigitalIoPin* DIRX;
@@ -105,6 +113,8 @@ void RIT_IRQHandler(void)
 			MY->calibration();
 		}
 		else {
+			MX->calcStepCmRetio(xLength);
+			MY->calcStepCmRetio(yLength);
 			//distanceRatio = stepper.getCountstep()/10;
 			Chip_RIT_Disable(LPC_RITIMER); // disable timer
 			// Give semaphore and set context switch flag if a higher priority task was woken up
@@ -112,6 +122,22 @@ void RIT_IRQHandler(void)
 		}
 		break;
 	case RUN:
+		if (countStruct.x > 0){
+			MX->move();
+			countStruct.x--;
+		}
+
+		if (countStruct.y > 0){
+			MY->move();
+			countStruct.y--;
+		}
+
+		if ((countStruct.x == 0 && countStruct.y == 0)||LimitSWXMax->read()||LimitSWXMin->read()){
+			Chip_RIT_Disable(LPC_RITIMER); // disable timer
+			// Give semaphore and set context switch flag if a higher priority task was woken up
+			xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
+		}
+
 		break;
 
 	}
@@ -124,14 +150,16 @@ void RIT_IRQHandler(void)
 //and waits until count RIT interrupts have occurred.
 //Note that the actual counting is performed by the ISR and this function just waits on the semaphore.
 
-void RIT_start(int count, int us, RIT_TYPE type)
+void RIT_start(StepCount count, int us, RIT_TYPE type,Motor *m)
 {
+	countStruct = count;
+	mInUse = m;
 	uint64_t cmp_value;
 
 	cmp_value = (uint64_t) Chip_Clock_GetSystemClockRate() * (uint64_t) us / 1000000;
 
 	Chip_RIT_Disable(LPC_RITIMER);
-	RIT_count = count;
+
 	RIT_type = type;
 	Chip_RIT_EnableCompClear(LPC_RITIMER);
 	Chip_RIT_SetCounter(LPC_RITIMER, 0);
@@ -148,15 +176,28 @@ void RIT_start(int count, int us, RIT_TYPE type)
 
 
 static void calibrateTask(void *pvParameters) {
-
-	if (xSemaphoreTake(pvParameters,DLY20MS) == pdTRUE){
+	StepCount c;
+	c.x = 0;
+	c.y= 0;
+	if (xSemaphoreTake(calibrateSemaphore,DLY1MS) == pdTRUE){
 
 	}
 	while(1){
+		c.x=500;
+		c.y=600;
+		RIT_start(c,TICK_RATE/800,RUN, MX);
+		/*
 		if (MX->getCalibratedFlag()==false){
 			//A very large number of step to get it moving
-			RIT_start(10000,TICK_RATE/MX->getpps(),CALIBRATE);
+
+			RIT_start(c,TICK_RATE/MX->getpps(),CALIBRATE,MX);
+		} else {
+			c.x=1000;
+			c.y=1200;
+			RIT_start(c,TICK_RATE/600,RUN, MX);
+			//RIT_start(1,TICK_RATE/600,RUN, MY);
 		}
+		*/
 	}
 }
 
@@ -164,15 +205,26 @@ static void calibrateTask(void *pvParameters) {
 static void readCommand(void* param){
 	Syslog* guard = (Syslog*)param;
 	while(1){
+		guard->getCommand(xQueue);
+		vTaskDelay(DLY1MS);
+	}
+	/*
+	while(1){
 		if (xSemaphoreTake(calibrateSemaphore,(TickType_t) 10) == pdTRUE){
 			guard->getCommand(xQueue);
 		}
 	}
+	 */
 }
 
 /*This task wait for the semaphore, take it if it is free.
 Then it will read command from the Queue and execute the command and release the semaphore.
  */
+
+int psCalc(int step, int xpos, int ypos )
+{
+	return (step/(sqrt((xpos*xpos) + (ypos*ypos) ))) * DefPPS;
+}
 
 static void readQueue(void* param){
 	Servo pencil(0,10);
@@ -189,10 +241,22 @@ static void readQueue(void* param){
 				laser.Power(commandToQueue.power);
 				guard->write("OK\r\n");
 			}else if (commandToQueue.type ==BOTH_STEPPER){
+				int ppsx = psCalc(MX->calculateMove(commandToQueue.geoX), MX->calculateMove(commandToQueue.geoX), MY->calculateMove(commandToQueue.geoY));
+				int ppsy = psCalc(MY->calculateMove(commandToQueue.geoY), MX->calculateMove(commandToQueue.geoX), MY->calculateMove(commandToQueue.geoY));
+
+				while(MX->calculateMove(commandToQueue.geoX)!=0 && MY->calculateMove(commandToQueue.geoY) !=0)
+				{
+					//RIT_start(1,TICK_RATE/ppsx,RUN, MX);
+					//RIT_start(1,TICK_RATE/ppsy,RUN, MY);
+				}
 				guard->write("OK\r\n");
+			}else {
+
 			}
 		}
+		vTaskDelay(DLY1MS);
 	}
+
 }
 
 int main(void)
@@ -217,10 +281,11 @@ int main(void)
 	LimitSWYMin = new DigitalIoPin(0,DigitalIoPin::pullup,true);
 	LimitSWYMax = new DigitalIoPin(1,DigitalIoPin::pullup,true);
 
-	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax);
-	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax);
+	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax,347);
+	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax,310);
 
 	syslog->InitMap();
+
 	xTaskCreate(readCommand, "readCommand",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
@@ -228,13 +293,12 @@ int main(void)
 	xTaskCreate(readQueue, "readQueue",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
-
+/*
 	xTaskCreate(calibrateTask, "calibrateTask",
 			configMINIMAL_STACK_SIZE, sbRIT, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
+*/
 
-
-	MX->stop();
 	/* Start the scheduler */
 	vTaskStartScheduler();
 

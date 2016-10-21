@@ -16,7 +16,7 @@
 #include "Macros.h"
 using namespace std;
 
-enum MotorCommandType	{BOTH_STEPPER, SERVOR, LASER};
+enum MotorCommandType	{BOTH_STEPPER, SERVOR, LASER, CALIBRATE_M10};
 
 struct CommandStruct {
 	MotorCommandType type;
@@ -117,8 +117,10 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				switch(t){
 				case 1 :
 					//M10 - Send back to mDraw the info.
-					Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
-					Board_UARTPutSTR("OK\n");
+					//Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
+					//Board_UARTPutSTR("OK\n");
+					commandToQueue.type= CALIBRATE_M10;
+					if (xQueueSend(xQueue,&commandToQueue,(TickType_t) 10)==pdTRUE){}
 					break;
 				case 2:
 					//G28- Do something ?
@@ -186,7 +188,9 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 									while (*pch) { // While there are more characters to process...
 										if (isdigit(*pch)) { // Upon finding a digit, ...
 											if(bIsFloat){
-												geoX += (float)strtol(pch, &pch, 10)/100;
+												//because Gcode takes only 2 decimal digit so just 2 cases is enough
+												float temp = (float)strtol(pch, &pch, 10);
+												geoX +=temp/100;
 											}else{
 												geoX = strtol(pch, &pch, 10);
 											}
@@ -206,11 +210,12 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 									while (*pch) { // While there are more characters to process...
 										if (isdigit(*pch)) { // Upon finding a digit, ...
 											if(bIsFloat){
-												geoY += (float)strtol(pch, &pch, 10)/100;
+												float temp = (float)strtol(pch, &pch, 10);
+												geoY +=temp/100;
 											}else{
 												geoY = strtol(pch, &pch, 10);
 											}
-										} else { // Otherwise, move on to the next character.
+										} else {
 											if(strncmp(pch,".", 1)==0){
 												bIsFloat = true;
 											}
@@ -244,7 +249,7 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				}
 
 				//Reset the word_count and reset the command
-				Board_UARTPutSTR("OK\n");
+				//Board_UARTPutSTR("OK\n");
 				word_count=0;
 				memset(command, 0, sizeof(command));
 			}

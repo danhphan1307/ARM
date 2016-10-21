@@ -13,7 +13,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "semphr.h"
-
+#include <stdlib.h>
 #endif /* MOTOR_H_ */
 
 
@@ -34,22 +34,6 @@ public:
 	virtual ~Motor();
 
 	//Calibration functions
-
-	void setStepNum(int s);
-	int getStepNum();
-	void resetStepNum();
-
-	int getStepMin();
-	void setStepMin(int s);
-
-	int getStepMax();
-	void setStepMax(int s);
-
-	int getMarginMin();
-	void setMarginMin(int m);
-
-	int getMarginMax();
-	void setMarginMax(int m);
 
 	void calibration();
 	bool getCalibratedFlag();
@@ -111,7 +95,7 @@ private:
 	float lengthInMm;
 	int touchCount;
 	int stepCount;
-
+	int margin;
 	//bool dir;
 
 	int Maxstepnum;
@@ -124,21 +108,6 @@ private:
 
 	int pps;
 
-	bool refresh;
-
-	moveDirType moveType;
-
-	float CurPos;
-
-	int stepMin;
-	int stepMax;
-
-
-	float minStepCmMRetio;
-	float maxStepCmMRetio;
-
-	int marginMin;
-	int marginMax;
 
 	DigitalIoPin* STEP;
 	DigitalIoPin* DIR;
@@ -157,8 +126,8 @@ private:
 	bool calibrateFlag;
 	int step;
 	bool dir; //direction
-	int countstep; //step between 2 switches
+
 	//Var for calibrating
 	bool status;
-	int tempCountStep;
+	int tempstep;
 };

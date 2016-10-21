@@ -104,11 +104,9 @@ void RIT_IRQHandler(void)
 	case CALIBRATE:
 		if (MX->getCalibratedFlag()==false){
 			MX->calibration();
-			MX->calcStepCmRetio(xLength);
 		}
 		else if (MY->getCalibratedFlag()==false){
 			MY->calibration();
-			MY->calcStepCmRetio(yLength);
 		}
 		else {
 			//distanceRatio = stepper.getCountstep()/10;
@@ -121,7 +119,7 @@ void RIT_IRQHandler(void)
 		/*
 		mInUse->move();
 		 */
-		if ((dataCountStruct.x <= 0 && dataCountStruct.y <= 0) || MX->isHit() || MY->isHit()){
+		if ((dataCountStruct.x <= 0 && dataCountStruct.y <= 0)){
 			doneRunning = true;
 			Chip_RIT_Disable(LPC_RITIMER); // disable timer
 			// Give semaphore and set context switch flag if a higher priority task was woken up
@@ -130,14 +128,15 @@ void RIT_IRQHandler(void)
 		}
 
 		if (runningMotor==0){
+			if (dataCountStruct.x>0){dataCountStruct.x--;MX->move();}
 
-			dataCountStruct.x--;
-			MX->move();
+
 			xSemaphoreGiveFromISR(sbRIT,&xHigherPriorityWoken);
 		}
 		if (runningMotor==1){
-			dataCountStruct.y--;
-			MY->move();
+			if (dataCountStruct.y>0){dataCountStruct.y--;
+			MY->move();}
+
 			xSemaphoreGiveFromISR(sbRIT,&xHigherPriorityWoken);
 		}
 
@@ -153,7 +152,7 @@ void RIT_IRQHandler(void)
 //The following function sets up RIT interrupt at given interval
 //and waits until count RIT interrupts have occurred.
 //Note that the actual counting is performed by the ISR and this function just waits on the semaphore.
-void RIT_start(StepCount count, int us, RIT_TYPE type,int _runningMotor)
+void RIT_start( int us, RIT_TYPE type,int _runningMotor)
 {
 	//dataCountStruct.x = count.x;
 	//dataCountStruct.y = count.y
@@ -174,20 +173,6 @@ void RIT_start(StepCount count, int us, RIT_TYPE type,int _runningMotor)
 		// unexpected error
 	}
 }
-static void calibrateTask(void *pvParameters) {
-	StepCount c(0,0);
-	SemaphoreHandle_t *calSem = (SemaphoreHandle_t*)pvParameters;
-	while(1){
-		if (xSemaphoreTake(calSem,DLY20MS)== pdTRUE){
-			if (MX->getCalibratedFlag()==false){
-				//A very large number of step to get it moving
-				RIT_start(c,TICK_RATE/MX->getpps(),CALIBRATE,0);
-			} else {
-				xSemaphoreGive(calSem);
-			}
-		}
-	}
-}
 int psCalc(int step, int deli )
 {
 	return (step/(sqrt((step*step) + (deli*deli) ))) * DefPPS;
@@ -196,6 +181,7 @@ int psCalc(int step, int deli )
  *This task read command from UART and put it to the Queue
  */
 static void readCommand(void* param){
+	RIT_start(TICK_RATE/MX->getpps(),CALIBRATE,0);
 	Syslog* guard = (Syslog*)param;
 	while(1){
 		if ( xQueue != 0){
@@ -204,6 +190,7 @@ static void readCommand(void* param){
 		}
 	}
 }
+int outOfLoop = 0;
 /*
  * This task will check if there is anything in the queue and then execute it.
  */
@@ -213,6 +200,7 @@ static void readQueue(void* param){
 	Laser laser(0,12);
 	Syslog* guard = (Syslog*)param;
 	CommandStruct commandToQueue;
+
 	while(1){
 		if ( xQueue != 0  && xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
 			if (commandToQueue.type ==SERVOR){
@@ -240,34 +228,21 @@ static void readQueue(void* param){
 					dataCountStruct.y *=-1;
 					MY->reverse();
 				}
-				bool flag = false;
+				guard->write("OK\r\n");
+
 				while (1){
+					//Return from loop is running is done
 					if(xSemaphoreTake(runningSemaphore,DLY1MS)==pdTRUE){
 						break;
 					}
-					RIT_start(c,TICK_RATE/ppsX,RUN, 0);
-					RIT_start(c,TICK_RATE/ppsY,RUN, 1);
+					RIT_start(TICK_RATE/3000,RUN, 0);
+					RIT_start(TICK_RATE/3000,RUN, 1);
 				}
-				guard->write("OK\r\n");
+				outOfLoop++;
 			}
 		}
 	}
-}
-static void motorXTask(void* param){
-	while(1){
-		if (xSemaphoreTake(motorXSemaphore,DLY1MS)==pdTRUE){
-			MX->move();
-		}
-		vTaskDelay(DLY1MS);
-	}
-}
-static void motorYTask(void* param){
-	while(1){
-		if (xSemaphoreTake(motorYSemaphore,DLY1MS)==pdTRUE){
-			MY->move();
-		}
-		vTaskDelay(DLY1MS);
-	}
+	outOfLoop++;
 }
 
 int main(void)

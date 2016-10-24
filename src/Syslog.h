@@ -102,7 +102,6 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 
 	if (num!=EOF){
 		command[word_count] = num;
-		Board_UARTPutChar(num);
 		word_count++;
 
 		if(xSemaphoreTake(syslogMutex, DLY20MS) == pdTRUE) {
@@ -117,10 +116,14 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				switch(t){
 				case 1 :
 					//M10 - Send back to mDraw the info.
+<<<<<<< Upstream, based on branch 'master' of https://github.com/danhphan1307/ARM.git
 					//Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
 					//Board_UARTPutSTR("OK\n");
 					commandToQueue.type= CALIBRATE_M10;
 					if (xQueueSend(xQueue,&commandToQueue,(TickType_t) 10)==pdTRUE){}
+=======
+					Board_UARTPutSTR("M10 XY 347 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n OK\n\r");
+>>>>>>> cba594b near final version - small modifies will come later
 					break;
 				case 2:
 					//G28- Do something ?
@@ -247,9 +250,12 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 					break;
 				}
 				}
+<<<<<<< Upstream, based on branch 'master' of https://github.com/danhphan1307/ARM.git
 
 				//Reset the word_count and reset the command
 				//Board_UARTPutSTR("OK\n");
+=======
+>>>>>>> cba594b near final version - small modifies will come later
 				word_count=0;
 				memset(command, 0, sizeof(command));
 			}

@@ -16,21 +16,15 @@
 #include <stdlib.h>
 #endif /* MOTOR_H_ */
 
-
 enum cmdt{left, right, PPS, DY, not_available, calib, block, STOP};
-//enum papirtype{left, right, PPS, DY, not_available, calib, block, STOP};
 
-enum moveDirType{mLeft, mRight};
-
-
-
+enum MotorType{X,Y};
 
 class Motor {
 public:
 
-	//done
 	//Motor();
-	Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin* Lmax, float mmLength);
+	Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin* Lmax,MotorType t,void(*call)(int,int,RIT_TYPE,MotorType));
 	virtual ~Motor();
 
 	//Calibration functions
@@ -65,14 +59,8 @@ public:
 	void setpps(int b);
 	//end movment functions
 
-	/*void executecmd(cmdque cmds);
-	bool getReleseFlag();
-	void setReleseFlag(bool b);
-	 */
-
-
-	float getCurPos();
-	void setCurPos(float p);
+	float getCurPos() {return curPos;}
+	void setCurPos(float p) {curPos = p;}
 
 	bool getAllowFlag();
 	void setAllowFlag(bool b);
@@ -80,33 +68,36 @@ public:
 	bool getRefRITT();
 	void setRefRITT(bool b);
 
-	//DOne
-	void setMoveType(moveDirType t);
-	moveDirType getMoveType();
-	float getCMRetio();
 
 	//Move by geo
-	void move(float geo);
 	float getCountStepToMmRatio() { return mmToStepRatio;}
 	bool isHit() {return LimitSWMax->read()||LimitSWMin->read();}
-	void stepUp() { STEP->write(true);}
-	void stepDown() { STEP->write(false);}
+	//Move by geo
+	void move(float geo);
+	void swichpin();
+
+	//Stepping function
+	void stepUp() {if (xSemaphoreTake(stepSemaphore,(TickType_t)1)){STEP->write(true);}}
+	void stepDown() {if (xSemaphoreTake(stepSemaphore,(TickType_t)1)){STEP->write(false);}}
+
+	//Accelerating and decelerating
+	void speeding(int steps);
+
+	void giveSemaphore(){ xSemaphoreGive(stepSemaphore);}
 private:
 	float lengthInMm;
 	int touchCount;
 	int stepCount;
 	int margin;
+	SemaphoreHandle_t stepSemaphore;
+	int margin;
 	//bool dir;
 
-	int Maxstepnum;
-
-	bool allow;
-
-	bool calibrated;
-
+	float curPos;
 	bool release;
 
 	int pps;
+	float errorRatio; //acceptable error ratio when calibrating
 
 
 	DigitalIoPin* STEP;
@@ -117,17 +108,21 @@ private:
 
 	float mmToStepRatio;
 
-	bool pulse = true;
-	//Flag to signal that semaphore can be released
-	bool releaseSemaphoreFlag;
-	//Flag to allow execution , running motor in this case
-	bool allowExecutionFlag;
-	//Flag to signal that motor is in calibrating stage
-	bool calibrateFlag;
+
+	bool calibrated;
 	int step;
 	bool dir; //direction
+
+
 
 	//Var for calibrating
 	bool status;
 	int tempstep;
+	int tempstep;
+	MotorType type;
+	int touchCount;
+	int stepCount;
+
+	//Callback for RIT
+	void (*call)(int,int,RIT_TYPE,MotorType);
 };

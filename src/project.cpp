@@ -42,17 +42,21 @@
 #include <string.h>
 #include "Macros.h"
 #include "Motor.h"
+//#include "Utitlities.h"
+
+//using namespace Utility;
 Syslog* syslog = new Syslog();
 SemaphoreHandle_t calibrateSemaphore = xSemaphoreCreateBinary();
 SemaphoreHandle_t runningSemaphore = xSemaphoreCreateBinary();
-SemaphoreHandle_t motorXSemaphore = xSemaphoreCreateBinary();
-SemaphoreHandle_t motorYSemaphore = xSemaphoreCreateBinary();
+SemaphoreHandle_t countingRun = xSemaphoreCreateCounting(20,0);
 QueueHandle_t xQueue = xQueueCreate(50,sizeof(CommandStruct));
-enum RIT_TYPE  {CALIBRATE, RUN}; // rit running type
+
 RIT_TYPE RIT_type;
 Motor* mInUse;
 volatile int runningMotor = 0;
+volatile int counterRatio = 0;
 bool doneRunning = false;
+
 struct StepCount{
 	int x;
 	int y;
@@ -92,6 +96,16 @@ static void prvSetupHardware(void)
 	// Note that in a Cortex-M3 a higher number indicates lower interrupt priority
 	NVIC_SetPriority( RITIMER_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY + 1 );
 }
+
+static void calibrate(){
+	while (MX->getCalibratedFlag()==false){
+		MX->calibration();
+	}
+	while (MY->getCalibratedFlag()==false){
+		MY->calibration();
+	}
+}
+
 extern "C" {
 void RIT_IRQHandler(void)
 {
@@ -100,49 +114,17 @@ void RIT_IRQHandler(void)
 	// Tell timer that we have processed the interrupt.
 	// Timer then removes the IRQ until next match occurs
 	Chip_RIT_ClearIntStatus(LPC_RITIMER); // clear IRQ flag
-	switch (RIT_type){
-	case CALIBRATE:
-		if (MX->getCalibratedFlag()==false){
-			MX->calibration();
-		}
-		else if (MY->getCalibratedFlag()==false){
-			MY->calibration();
-		}
-		else {
-			//distanceRatio = stepper.getCountstep()/10;
-			Chip_RIT_Disable(LPC_RITIMER); // disable timer
-			// Give semaphore and set context switch flag if a higher priority task was woken up
-			xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
-		}
-		break;
-	case RUN:
-		/*
-		mInUse->move();
-		 */
-		if ((dataCountStruct.x <= 0 && dataCountStruct.y <= 0)){
-			doneRunning = true;
-			Chip_RIT_Disable(LPC_RITIMER); // disable timer
-			// Give semaphore and set context switch flag if a higher priority task was woken up
-			xSemaphoreGiveFromISR(runningSemaphore,&xHigherPriorityWoken);
-			xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
-		}
 
-		if (runningMotor==0){
-			if (dataCountStruct.x>0){dataCountStruct.x--;MX->move();}
+	if (RIT_count > 0) {
 
+		mInUse->swichpin();
+		RIT_count--;
+	}
+	else {
 
-			xSemaphoreGiveFromISR(sbRIT,&xHigherPriorityWoken);
-		}
-		if (runningMotor==1){
-			if (dataCountStruct.y>0){dataCountStruct.y--;
-			MY->move();}
-
-			xSemaphoreGiveFromISR(sbRIT,&xHigherPriorityWoken);
-		}
-
-		//Chip_RIT_Disable(LPC_RITIMER); // disable timerx
+		Chip_RIT_Disable(LPC_RITIMER); // disable timer
+		// Give semaphore and set context switch flag if a higher priority task was woken up
 		xSemaphoreGiveFromISR(sbRIT, &xHigherPriorityWoken);
-		break;
 	}
 	// End the ISR and (possibly) do a context switch
 	portEND_SWITCHING_ISR(xHigherPriorityWoken);
@@ -152,15 +134,23 @@ void RIT_IRQHandler(void)
 //The following function sets up RIT interrupt at given interval
 //and waits until count RIT interrupts have occurred.
 //Note that the actual counting is performed by the ISR and this function just waits on the semaphore.
-void RIT_start( int us, RIT_TYPE type,int _runningMotor)
+static void RIT_start(int count, int us, RIT_TYPE type,MotorType _runningMotor)
 {
-	//dataCountStruct.x = count.x;
-	//dataCountStruct.y = count.y
-	runningMotor = _runningMotor;
 	uint64_t cmp_value;
-	cmp_value = (uint64_t) Chip_Clock_GetSystemClockRate() * (uint64_t) us / 1000000;
+	cmp_value = (uint64_t) Chip_Clock_GetSystemClockRate() * (uint64_t) 1/us;
 	Chip_RIT_Disable(LPC_RITIMER);
+	RIT_count = count;
 	RIT_type = type;
+
+	if(_runningMotor == X)
+	{
+		mInUse=MX;
+	}
+	if(_runningMotor == Y)
+	{
+		mInUse=MY;
+	}
+
 	Chip_RIT_EnableCompClear(LPC_RITIMER);
 	Chip_RIT_SetCounter(LPC_RITIMER, 0);
 	Chip_RIT_SetCompareValue(LPC_RITIMER, cmp_value);
@@ -173,15 +163,152 @@ void RIT_start( int us, RIT_TYPE type,int _runningMotor)
 		// unexpected error
 	}
 }
-int psCalc(int step, int deli )
+
+
+int getDistance(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 {
-	return (step/(sqrt((step*step) + (deli*deli) ))) * DefPPS;
+	return (sqrt( ((NewPosX - CurPosX)*(NewPosX - CurPosX)) + ((NewPosY - CurPosY)*(NewPosY - CurPosY)) ));
+}
+
+
+//lastvalue                newvalue
+void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
+{
+	int speed =MINSPEED;
+
+
+	int  OrigX, OrigY;
+
+
+	//calculate x y deltas
+	int deltaX = abs(NewPosX-CurPosX);
+	int deltaY = abs(NewPosY-CurPosY);
+
+	//this decide direction
+	int sx=1, sy=1;
+
+	if(CurPosX<NewPosX){
+		sx = 1;
+		MX->setDir(false);
+
+	}else{
+		sx = -1;
+		MX->setDir(true);
+
+	}
+	if(CurPosY<NewPosY){
+		sy = 1;
+		MY->setDir(false);
+		//directionY=true;
+	}else{
+		sy = -1;
+		MY->setDir(true);
+		//directionY=false;
+	}
+
+	//at the beginning find out which delta is longer and put error in the middle of the line
+	//if deltaX > deltaY error = deltaX else error = -deltaY
+	//int error = (deltaX>deltaY ? deltaX : -deltaY)/2;
+	//longerdelta for acceleration
+	int error;
+
+	if(deltaX > deltaY){
+		error = deltaX/2;
+		//longerDelta = deltaX;
+	}else{
+		error = -deltaY/2;
+		//longerDelta = deltaY;
+	}
+
+	//old error variable
+	int OldErr;
+
+	//int rounds = 0;
+	//int accelerationlenght= 0;
+	char buffer[64];
+
+	int origDis = getDistance(CurPosX, CurPosY, NewPosX, NewPosY);
+
+
+	while(1){
+
+		OrigX=CurPosX;
+		OrigY=CurPosY;
+
+		//break loop if last and new are same
+		if (CurPosX==NewPosX && CurPosY==NewPosY)
+		{
+			speed = MINSPEED;
+			break;
+		}
+
+		OldErr = error;
+		//recalculate error
+		//moves one or both. Depends on OldErr value. Longer delta moves always
+
+		if(origDis > 3000)
+		{
+			if((origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) >=0 && (origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) < (origDis/4))
+			{
+				if((speed+40) < MAXSPEED)
+				{
+					speed +=40;
+				}
+				else
+				{
+					speed = MAXSPEED;
+				}
+			}
+			else if((origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) >= (3*origDis/4))
+			{
+				if((speed-40) > MINSPEED)
+				{
+					speed -=40;
+				}
+				else
+				{
+					speed = MINSPEED;
+				}
+
+			}
+		}
+
+		if (OldErr >-deltaX) {
+			error -= deltaY;
+			CurPosX += sx;
+			RIT_start( 1, speed, RUN,X);
+		}
+
+		if (OldErr < deltaY) {
+			error += deltaX;
+			CurPosY += sy;
+			RIT_start( 1, speed, RUN,Y);
+
+		}
+		//int disss = getDistance(CurPosX, CurPosY, NewPosX, NewPosY);
+		//sprintf(buffer,"\r\nSpeed Was ( %d)\t Distance was: %d\r\n",speed, disss);
+		//rounds++;
+
+	}
+
+}
+
+
+void moveMotor(CommandStruct commandToQueue){
+	int oldXInMm = int(MX->getCurPos()*MX->getCountStepToMmRatio());
+	int oldYInMm = int(MY->getCurPos()*MY->getCountStepToMmRatio());
+	int newXInMm = int(commandToQueue.geoX*MX->getCountStepToMmRatio());
+	int newYInMm = int(commandToQueue.geoY*MY->getCountStepToMmRatio());
+	BHL(oldXInMm, oldYInMm, newXInMm, newYInMm);
+	//BHL(MX->getCurPos()*43.5, MY->getCurPos()*43.5, commandToQueue.geoX*43.5, commandToQueue.geoY*43.5);
+	MX->setCurPos(commandToQueue.geoX);
+	MY->setCurPos(commandToQueue.geoY);
 }
 /*
  *This task read command from UART and put it to the Queue
  */
 static void readCommand(void* param){
-	RIT_start(TICK_RATE/MX->getpps(),CALIBRATE,0);
+	calibrate();
 	Syslog* guard = (Syslog*)param;
 	while(1){
 		if ( xQueue != 0){
@@ -190,16 +317,19 @@ static void readCommand(void* param){
 		}
 	}
 }
-int outOfLoop = 0;
+
+
+
 /*
  * This task will check if there is anything in the queue and then execute it.
  */
 static void readQueue(void* param){
-	float ratio = 87;
+
 	Servo pencil(0,10);
 	Laser laser(0,12);
 	Syslog* guard = (Syslog*)param;
 	CommandStruct commandToQueue;
+
 
 	while(1){
 		if ( xQueue != 0  && xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
@@ -210,40 +340,18 @@ static void readQueue(void* param){
 				laser.Power(commandToQueue.power);
 				guard->write("OK\r\n");
 			}else if (commandToQueue.type ==BOTH_STEPPER){
-				int distanceX = (commandToQueue.geoX - countStruct.x)*ratio;
-				int distanceY = (commandToQueue.geoY - countStruct.y)*ratio;
-				countStruct.x = commandToQueue.geoX;//*MX->getCountStepToMmRatio();
-				countStruct.y = commandToQueue.geoY;//*MY->getCountStepToMmRatio();
-				//float tan = commandToQueue.geoX/commandToQueue.geoY;
-				int ppsX = psCalc(distanceX,distanceY);
-				int ppsY = psCalc(distanceY,distanceX);
-				StepCount c(distanceX,distanceY);
-				dataCountStruct.x = distanceX;
-				dataCountStruct.y = distanceY;
-				if (dataCountStruct.x <0) {
-					dataCountStruct.x *=-1;
-					MX->reverse();
-				}
-				if (dataCountStruct.y <0) {
-					dataCountStruct.y *=-1;
-					MY->reverse();
-				}
+				//Motor code goes here.
+				moveMotor(commandToQueue);
 				guard->write("OK\r\n");
-
-				while (1){
-					//Return from loop is running is done
-					if(xSemaphoreTake(runningSemaphore,DLY1MS)==pdTRUE){
-						break;
-					}
-					RIT_start(TICK_RATE/3000,RUN, 0);
-					RIT_start(TICK_RATE/3000,RUN, 1);
-				}
-				outOfLoop++;
 			}
 		}
 	}
-	outOfLoop++;
+
 }
+
+
+
+
 
 int main(void)
 {
@@ -261,10 +369,12 @@ int main(void)
 	//Limit Swiches Y
 	LimitSWYMin = new DigitalIoPin(0,DigitalIoPin::pullup,true);
 	LimitSWYMax = new DigitalIoPin(1,DigitalIoPin::pullup,true);
-	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax,347);
-	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax,310);
+	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax,X,&RIT_start);
+	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax,Y,&RIT_start);
 	/* End of set up motor*/
 	syslog->InitMap();
+
+
 
 	xTaskCreate(readCommand, "readCommand",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
@@ -272,6 +382,7 @@ int main(void)
 	xTaskCreate(readQueue, "readQueue",
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
+
 	/*
 	xTaskCreate(calibrateTask, "calibrateTask",
 			configMINIMAL_STACK_SIZE, calibrateSemaphore, (tskIDLE_PRIORITY + 1UL),

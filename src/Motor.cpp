@@ -8,7 +8,11 @@
 
 
 
-Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin* Lmax, float mmLength)
+
+
+Motor::Motor(DigitalIoPin* S, DigitalIoPin* D,
+		DigitalIoPin* Lmin, DigitalIoPin* Lmax,MotorType t,
+		void(*_call)(int,int,RIT_TYPE,MotorType))
 {
 	calibrated = false;
 	STEP = S;
@@ -18,21 +22,21 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D, DigitalIoPin* Lmin, DigitalIoPin*
 	STEP->write(false);
 	DIR->write(false);
 
-
-	Maxstepnum = 0;
-
-	pps = 7000;
-
-
+	pps = 30000;
 	touchCount=0;
-
-	lengthInMm = mmLength;
+	errorRatio = 0.005;
 
 	//Calibration
 	tempstep = 0;
 	margin = 500;
 	stepCount = 0;
 	step=0;
+	type=t;
+
+	lengthInMm = type == X ? 347 : 310;
+	call = _call;
+	stepSemaphore = xSemaphoreCreateBinary();
+	curPos = 0.0;
 }
 
 
@@ -68,11 +72,10 @@ void Motor::reverse()
 void Motor::move()
 {
 	//if (LimitSWMax->read() || LimitSWMin->read()){ reverse(); }
-	STEP->write(true);
-	stepCount++;
-
-	STEP->write(false);
-
+	//stepUp();
+	//call( 1, pps*2, RUN,type);
+	//stepDown();
+	call( 1, pps, RUN,type);
 }
 
 //DIrections functions
@@ -86,7 +89,6 @@ bool Motor::getDir()
 	return DIR->read();
 }
 
-
 // Gives the motor a pps values for the stepping / half stepping 
 int Motor::getpps()
 {
@@ -98,6 +100,10 @@ void Motor::setpps(int b)
 	pps = b;
 }
 
+void Motor::swichpin()
+{
+	STEP->write(!STEP->read());
+}
 
 
 //Calibrate
@@ -114,16 +120,12 @@ void Motor::setCalibratedFlag(bool c)
 }
 
 
-
-
 void Motor::calibration() {
-	int hitCount = 0;
-
-	char ch[200] = {0};
 	if (touchCount==4){
 		move();
 		tempstep++;
 		if(tempstep==step){
+			reverse();
 			calibrated = true; //turn off calibrate
 			mmToStepRatio = (float)step / lengthInMm; //calculate ratio
 		}
@@ -132,18 +134,33 @@ void Motor::calibration() {
 		move();
 		tempstep++;
 		if (tempstep==step){
-			touchCount++;
-			step-=margin;
-			if (status){
-				calibrated = true; //turn off calibrate
-				mmToStepRatio = (float)step / lengthInMm; //calculate ratio
-			}
-			else {
-				reverse();
-				tempstep=0;
-				touchCount++;
-			}
 
+			step-=margin;
+			if (type==X){
+				if (!status){
+					reverse();
+					calibrated = true; //turn off calibrate
+					mmToStepRatio = (float)step / lengthInMm; //calculate ratio
+					return;
+				}
+				else {
+					reverse();
+					tempstep=0;
+					touchCount++;
+				}
+			} else {
+				if (!status){
+					reverse();
+					calibrated = true; //turn off calibrate
+					mmToStepRatio = (float)step / lengthInMm; //calculate ratio
+					return;
+				}
+				else {
+					reverse();
+					tempstep=0;
+					touchCount++;
+				}
+			}
 		}
 	}
 	else if (touchCount==2){
@@ -154,7 +171,7 @@ void Motor::calibration() {
 				|| (!status &&LimitSWMax->read()) ){
 			reverse();
 			status=LimitSWMax->read();
-			if (abs((tempstep-step))>100){
+			if (abs((tempstep-step))>step*errorRatio){
 				touchCount = 0;
 				//recalculate
 				tempstep=0;
@@ -188,6 +205,7 @@ void Motor::calibration() {
 			move();
 		} else {
 			//Turn off first time sprint if switch is hit
+
 			status = LimitSWMax->read();
 			DIR->write(!status);
 			stop();
@@ -196,7 +214,4 @@ void Motor::calibration() {
 	}
 }
 
-/*
-void Motor::move(float geo){
 
-}*/

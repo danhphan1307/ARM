@@ -12,11 +12,10 @@ class Servo
 public:
 	Servo(int pin,int port);
 	void Degree(int degree);
-
+	int GetDegree();
 private:
 	int pin;
 	int port;
-	int pendown;
-	int penup;
+	int iCurrentDegree;
 };
 #endif

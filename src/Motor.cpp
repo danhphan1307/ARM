@@ -7,9 +7,6 @@
 #include "Motor.h"
 
 
-
-
-
 Motor::Motor(DigitalIoPin* S, DigitalIoPin* D,
 		DigitalIoPin* Lmin, DigitalIoPin* Lmax,MotorType t,
 		void(*_call)(int,int,RIT_TYPE,MotorType))

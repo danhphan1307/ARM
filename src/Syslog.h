@@ -114,22 +114,14 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 
 				int t = my_map.find(str)->second;
 				switch(t){
-				case 1 :
-					//M10 - Send back to mDraw the info.
-<<<<<<< Upstream, based on branch 'master' of https://github.com/danhphan1307/ARM.git
-					//Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
-					//Board_UARTPutSTR("OK\n");
-					commandToQueue.type= CALIBRATE_M10;
-					if (xQueueSend(xQueue,&commandToQueue,(TickType_t) 10)==pdTRUE){}
-=======
-					Board_UARTPutSTR("M10 XY 347 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n OK\n\r");
->>>>>>> cba594b near final version - small modifies will come later
+				case 1 : //M10 - Send back to mDraw the info.
+					Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
+					Board_UARTPutSTR("OK\n");
 					break;
-				case 2:
-					//G28- Do something ?
+				case 2: //G28- Do something ?
 					break;
-				case 3:{
-					//M1 - Pencil task
+				case 3://M1 - Pencil task
+				{
 					char  *p = command;
 					int iDegree;
 					while (*p) { // While there are more characters to process...
@@ -148,8 +140,7 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 					break;
 				}
 
-				case 4:
-					//M4 - laser
+				case 4://M4 - laser
 				{
 					char  *p = command;
 					int iPower;
@@ -167,16 +158,15 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 					//power of the laser will be load to iPower. Use this for the laser
 					break;
 				}
-				case 5:
-					//G1 - Move the stepper according to X and Y
+				case 5: //G1 - Move the stepper according to X and Y
 				{
 					char* pch;
-					pch = strtok (command," ");
+					pch = strtok (command," ");//split the command by space
 					float geoX =0.0;
 					float geoY =0.0;
 					bool bIsNegativeX = false;
 					bool bIsNegativeY = false;
-					//split the command by space
+
 					while (pch != NULL)
 					{
 						if(strncmp(pch,"A0",2)==0){
@@ -250,12 +240,6 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 					break;
 				}
 				}
-<<<<<<< Upstream, based on branch 'master' of https://github.com/danhphan1307/ARM.git
-
-				//Reset the word_count and reset the command
-				//Board_UARTPutSTR("OK\n");
-=======
->>>>>>> cba594b near final version - small modifies will come later
 				word_count=0;
 				memset(command, 0, sizeof(command));
 			}

@@ -114,19 +114,10 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 
 				int t = my_map.find(str)->second;
 				switch(t){
-<<<<<<< HEAD
-				case 1 :
-					//M10 - Send back to mDraw the info.
-					//Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
-					//Board_UARTPutSTR("OK\n");
-					commandToQueue.type= CALIBRATE_M10;
-					if (xQueueSend(xQueue,&commandToQueue,(TickType_t) 10)==pdTRUE){}
-					Board_UARTPutSTR("M10 XY 347 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n OK\n\r");
-=======
+
 				case 1 : //M10 - Send back to mDraw the info.
 					Board_UARTPutSTR("M10 XY 380 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
 					Board_UARTPutSTR("OK\n");
->>>>>>> refs/remotes/origin/master
 					break;
 				case 2: //G28- Do something ?
 					break;
@@ -250,12 +241,7 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 					break;
 				}
 				}
-<<<<<<< HEAD
 
-				//Reset the word_count and reset the command
-				//Board_UARTPutSTR("OK\n");
-=======
->>>>>>> refs/remotes/origin/master
 				word_count=0;
 				memset(command, 0, sizeof(command));
 			}

@@ -316,7 +316,7 @@ static void readQueue(void* param){
 	CommandStruct commandToQueue;
 
 	while(1){
-		if ( xQueue != 0  && xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 30)){
+		if ( xQueue != 0  && xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
 			if (commandToQueue.type ==SERVOR){
 				pencil.Degree(commandToQueue.degreeServo);
 				guard->write("OK\r\n");

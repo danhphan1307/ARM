@@ -9,6 +9,7 @@ Servo::Servo(int pin,int port)
 {
 	this->pin = pin;
 	this->port = port;
+	this->iCurrentDegree = UPPER_LIMIT/0.06;
 
 	Chip_SCT_Init(LPC_SCT0);
 	Chip_SCTPWM_Init(LPC_SCT0);
@@ -38,5 +39,10 @@ void Servo::Degree(int degree){
 	int temp = degree/0.06;
 	if(temp <= UPPER_LIMIT && temp >= LOWER_LIMIT){
 		LPC_SCT0->MATCHREL[1].L= temp;
+		iCurrentDegree = temp;
 	}
+}
+
+int Servo::GetDegree(){
+	return this->iCurrentDegree;
 }

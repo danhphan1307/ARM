@@ -35,7 +35,7 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D,
 
 	lengthInMm = type == X ? 347 : 310;
 	call = _call;
-	stepSemaphore = xSemaphoreCreateBinary();
+
 	curPos = 0.0;
 }
 
@@ -69,13 +69,9 @@ void Motor::reverse()
 {
 }
  */
-void Motor::move()
+void Motor::move(int _pps = 40000)
 {
-	//if (LimitSWMax->read() || LimitSWMin->read()){ reverse(); }
-	//stepUp();
-	//call( 1, pps*2, RUN,type);
-	//stepDown();
-	call( 1, pps, RUN,type);
+	call( 1, _pps, RUN,type);
 }
 
 //DIrections functions
@@ -170,7 +166,13 @@ void Motor::calibration() {
 		if ( (status && LimitSWMin->read())
 				|| (!status &&LimitSWMax->read()) ){
 			reverse();
+
 			status=LimitSWMax->read();
+
+			/*step-=margin;
+			tempstep=0;
+			touchCount++; //increase touch count
+			*/
 			if (abs((tempstep-step))>step*errorRatio){
 				touchCount = 0;
 				//recalculate
@@ -183,6 +185,7 @@ void Motor::calibration() {
 				tempstep=0;
 				touchCount++; //increase touch count
 			}
+
 		}
 
 	} else if (touchCount==1){

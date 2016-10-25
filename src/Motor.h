@@ -46,7 +46,7 @@ public:
 
 
 	//void move(int newPos);
-	void move();
+	void move(int pps);
 	int calculateMove(float newPos);
 
 	void calcStepCmRetio(int cm);
@@ -76,21 +76,15 @@ public:
 	void move(float geo);
 	void swichpin();
 
-	//Stepping function
-	void stepUp() {if (xSemaphoreTake(stepSemaphore,(TickType_t)1)){STEP->write(true);}}
-	void stepDown() {if (xSemaphoreTake(stepSemaphore,(TickType_t)1)){STEP->write(false);}}
 
-	//Accelerating and decelerating
-	void speeding(int steps);
 
-	void giveSemaphore(){ xSemaphoreGive(stepSemaphore);}
 private:
 	float lengthInMm;
 	int touchCount;
 	int stepCount;
 	int margin;
 	SemaphoreHandle_t stepSemaphore;
-	int margin;
+
 	//bool dir;
 
 	float curPos;
@@ -118,10 +112,9 @@ private:
 	//Var for calibrating
 	bool status;
 	int tempstep;
-	int tempstep;
+
 	MotorType type;
-	int touchCount;
-	int stepCount;
+
 
 	//Callback for RIT
 	void (*call)(int,int,RIT_TYPE,MotorType);

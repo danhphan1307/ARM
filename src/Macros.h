@@ -20,8 +20,8 @@ enum RIT_TYPE  {CALIBRATE, RUN}; // rit running type
 #define TICK_RATE 1000000
 
 
-#define MINSPEED 8000
-#define MAXSPEED 20000
+#define MINSPEED 75000
+#define MAXSPEED 150000
 
 
 //calculated in 10 micro meters (um)

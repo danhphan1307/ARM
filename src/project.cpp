@@ -53,20 +53,7 @@ QueueHandle_t xQueue = xQueueCreate(50,sizeof(CommandStruct));
 
 RIT_TYPE RIT_type;
 Motor* mInUse;
-volatile int runningMotor = 0;
-volatile int counterRatio = 0;
-bool doneRunning = false;
 
-struct StepCount{
-	int x;
-	int y;
-	StepCount(int _x, int _y){
-		x =_x;
-		y=_y;
-	}
-};
-volatile StepCount countStruct(0,0);
-volatile StepCount dataCountStruct(0,0);
 //MOTOR X
 static DigitalIoPin* STEPX;
 static DigitalIoPin* DIRX;
@@ -199,11 +186,11 @@ void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 	if(CurPosY<NewPosY){
 		sy = 1;
 		MY->setDir(false);
-		//directionY=true;
+
 	}else{
 		sy = -1;
 		MY->setDir(true);
-		//directionY=false;
+
 	}
 
 	//at the beginning find out which delta is longer and put error in the middle of the line
@@ -246,13 +233,13 @@ void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 		//recalculate error
 		//moves one or both. Depends on OldErr value. Longer delta moves always
 
-		if(origDis > 3000)
+		if(origDis > 180)
 		{
 			if((origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) >=0 && (origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) < (origDis/4))
 			{
-				if((speed+40) < MAXSPEED)
+				if((speed+10) < MAXSPEED)
 				{
-					speed +=40;
+					speed +=10;
 				}
 				else
 				{
@@ -261,9 +248,9 @@ void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 			}
 			else if((origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) >= (3*origDis/4))
 			{
-				if((speed-40) > MINSPEED)
+				if((speed-10) > MINSPEED)
 				{
-					speed -=40;
+					speed -=10;
 				}
 				else
 				{
@@ -276,18 +263,17 @@ void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 		if (OldErr >-deltaX) {
 			error -= deltaY;
 			CurPosX += sx;
-			RIT_start( 1, speed, RUN,X);
+			//RIT_start( 1, speed, RUN,X);
+			MX->move(speed*2);
 		}
 
 		if (OldErr < deltaY) {
 			error += deltaX;
 			CurPosY += sy;
-			RIT_start( 1, speed, RUN,Y);
+			//RIT_start( 1, speed, RUN,Y);
+			MY->move(speed*2);
 
 		}
-		//int disss = getDistance(CurPosX, CurPosY, NewPosX, NewPosY);
-		//sprintf(buffer,"\r\nSpeed Was ( %d)\t Distance was: %d\r\n",speed, disss);
-		//rounds++;
 
 	}
 
@@ -297,10 +283,11 @@ void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 void moveMotor(CommandStruct commandToQueue){
 	int oldXInMm = int(MX->getCurPos()*MX->getCountStepToMmRatio());
 	int oldYInMm = int(MY->getCurPos()*MY->getCountStepToMmRatio());
+	//int oldYInMm = int(MY->getCurPos()*MX->getCountStepToMmRatio());
 	int newXInMm = int(commandToQueue.geoX*MX->getCountStepToMmRatio());
 	int newYInMm = int(commandToQueue.geoY*MY->getCountStepToMmRatio());
+	//int newYInMm = int(commandToQueue.geoY*MX->getCountStepToMmRatio());
 	BHL(oldXInMm, oldYInMm, newXInMm, newYInMm);
-	//BHL(MX->getCurPos()*43.5, MY->getCurPos()*43.5, commandToQueue.geoX*43.5, commandToQueue.geoY*43.5);
 	MX->setCurPos(commandToQueue.geoX);
 	MY->setCurPos(commandToQueue.geoY);
 }

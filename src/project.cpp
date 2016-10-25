@@ -49,7 +49,7 @@ Syslog* syslog = new Syslog();
 SemaphoreHandle_t calibrateSemaphore = xSemaphoreCreateBinary();
 SemaphoreHandle_t runningSemaphore = xSemaphoreCreateBinary();
 SemaphoreHandle_t countingRun = xSemaphoreCreateCounting(20,0);
-QueueHandle_t xQueue = xQueueCreate(50,sizeof(CommandStruct));
+QueueHandle_t xQueue = xQueueCreate(150,sizeof(CommandStruct));
 
 RIT_TYPE RIT_type;
 Motor* mInUse;
@@ -291,6 +291,7 @@ void moveMotor(CommandStruct commandToQueue){
 	MX->setCurPos(commandToQueue.geoX);
 	MY->setCurPos(commandToQueue.geoY);
 }
+
 /*
  *This task read command from UART and put it to the Queue
  */
@@ -300,12 +301,9 @@ static void readCommand(void* param){
 	while(1){
 		if ( xQueue != 0){
 			guard->getCommand(xQueue);
-			//
 		}
 	}
 }
-
-
 
 /*
  * This task will check if there is anything in the queue and then execute it.
@@ -317,9 +315,8 @@ static void readQueue(void* param){
 	Syslog* guard = (Syslog*)param;
 	CommandStruct commandToQueue;
 
-
 	while(1){
-		if ( xQueue != 0  && xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 10)){
+		if ( xQueue != 0  && xQueueReceive(xQueue,&commandToQueue,( TickType_t ) 30)){
 			if (commandToQueue.type ==SERVOR){
 				pencil.Degree(commandToQueue.degreeServo);
 				guard->write("OK\r\n");
@@ -333,10 +330,7 @@ static void readQueue(void* param){
 			}
 		}
 	}
-
 }
-
-
 
 
 
@@ -360,7 +354,6 @@ int main(void)
 	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax,Y,&RIT_start);
 	/* End of set up motor*/
 	syslog->InitMap();
-
 
 
 	xTaskCreate(readCommand, "readCommand",

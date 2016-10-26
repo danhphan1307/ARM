@@ -151,143 +151,119 @@ static void RIT_start(int count, int us, RIT_TYPE type,MotorType _runningMotor)
 	}
 }
 
-
+//Return distance in step
 int getDistance(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 {
 	return (sqrt( ((NewPosX - CurPosX)*(NewPosX - CurPosX)) + ((NewPosY - CurPosY)*(NewPosY - CurPosY)) ));
 }
 
+//Speeding up
+void Speedup(int CurPosX, int CurPosY, int NewPosX, int NewPosY, int origDis, int &speed)
+{
+	if(origDis > 180)
+	{
+		if((origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) >=0 && (origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) < (origDis/4))
+		{
+			if((speed+10) < MAXSPEED)
+			{
+				speed +=10;
+			}
+			else
+			{
+				speed = MAXSPEED;
+			}
+		}
+		else if((origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) >= (3*origDis/4))
+		{
+			if((speed-10) > MINSPEED)
+			{
+				speed -=10;
+			}
+			else
+			{
+				speed = MINSPEED;
+			}
 
-//lastvalue                newvalue
+		}
+	}
+	else{
+		speed = MINSPEED;
+	}
+}
+
+//Draw lines function
 void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 {
 	int speed =MINSPEED;
 
 
-	int  OrigX, OrigY;
-
-
 	//calculate x y deltas
-	int deltaX = abs(NewPosX-CurPosX);
-	int deltaY = abs(NewPosY-CurPosY);
+	long deltaX = abs(NewPosX-CurPosX);
+	long deltaY = abs(NewPosY-CurPosY);
 
-	//this decide direction
-	int sx=1, sy=1;
-
-	if(CurPosX<NewPosX){
-		sx = 1;
-		MX->setDir(false);
-
-	}else{
-		sx = -1;
-		MX->setDir(true);
-
-	}
-	if(CurPosY<NewPosY){
-		sy = 1;
-		MY->setDir(false);
-
-	}else{
-		sy = -1;
-		MY->setDir(true);
-
-	}
-
-	//at the beginning find out which delta is longer and put error in the middle of the line
-	//if deltaX > deltaY error = deltaX else error = -deltaY
-	//int error = (deltaX>deltaY ? deltaX : -deltaY)/2;
-	//longerdelta for acceleration
-	int error;
-
-	if(deltaX > deltaY){
-		error = deltaX/2;
-		//longerDelta = deltaX;
-	}else{
-		error = -deltaY/2;
-		//longerDelta = deltaY;
-	}
-
-	//old error variable
-	int OldErr;
-
-	//int rounds = 0;
-	//int accelerationlenght= 0;
-	char buffer[64];
+	MX->setDir(((NewPosX-CurPosX)>0?false:true));
+	MY->setDir(((NewPosY-CurPosY)>0?false:true));
 
 	int origDis = getDistance(CurPosX, CurPosY, NewPosX, NewPosY);
 
+	long i;
+	long end =0;
 
-	while(1){
-
-		OrigX=CurPosX;
-		OrigY=CurPosY;
-
-		//break loop if last and new are same
-		if (CurPosX==NewPosX && CurPosY==NewPosY)
+	if(deltaX >deltaY)
+	{
+		for(i=0;i<deltaX;i++)
 		{
-			speed = MINSPEED;
-			break;
-		}
-
-		OldErr = error;
-		//recalculate error
-		//moves one or both. Depends on OldErr value. Longer delta moves always
-
-		if(origDis > 180)
-		{
-			if((origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) >=0 && (origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) < (origDis/4))
-			{
-				if((speed+10) < MAXSPEED)
-				{
-					speed +=10;
-				}
-				else
-				{
-					speed = MAXSPEED;
-				}
-			}
-			else if((origDis -getDistance(CurPosX, CurPosY, NewPosX, NewPosY)) >= (3*origDis/4))
-			{
-				if((speed-10) > MINSPEED)
-				{
-					speed -=10;
-				}
-				else
-				{
-					speed = MINSPEED;
-				}
-
-			}
-		}
-
-		if (OldErr >-deltaX) {
-			error -= deltaY;
-			CurPosX += sx;
-			//RIT_start( 1, speed, RUN,X);
+			Speedup(CurPosX, CurPosY, NewPosX, NewPosY, origDis, speed);
+			//RIT_start(1,speed,RUN,X);
 			MX->move(speed*2);
+			end+=deltaY;
+			if(end>=deltaX)
+			{
+				end-=deltaX;
+				//RIT_start(1,speed,RUN,Y);
+				MY->move(speed*2);
+			}
 		}
-
-		if (OldErr < deltaY) {
-			error += deltaX;
-			CurPosY += sy;
-			//RIT_start( 1, speed, RUN,Y);
-			MY->move(speed*2);
-
-		}
-
 	}
-
+	else
+	{
+		for(i=0;i<deltaY;i++)
+		{
+			Speedup(CurPosX, CurPosY, NewPosX, NewPosY, origDis, speed);
+			//RIT_start(1,speed,RUN,Y);
+			MY->move(speed*2);
+			end+=deltaX;
+			if(end>=deltaY)
+			{
+				end-=deltaY;
+				//RIT_start(1,speed,RUN,X);
+				MX->move(speed*2);
+			}
+		}
+	}
 }
 
-
+/*
+ * This function moves the motor by data extracted from command
+ * Param: commandToQueue a command struct that holds the data sent from mDraw
+ *
+ * */
 void moveMotor(CommandStruct commandToQueue){
-	int oldXInMm = int(MX->getCurPos()*MX->getCountStepToMmRatio());
-	int oldYInMm = int(MY->getCurPos()*MY->getCountStepToMmRatio());
-	//int oldYInMm = int(MY->getCurPos()*MX->getCountStepToMmRatio());
-	int newXInMm = int(commandToQueue.geoX*MX->getCountStepToMmRatio());
-	int newYInMm = int(commandToQueue.geoY*MY->getCountStepToMmRatio());
-	//int newYInMm = int(commandToQueue.geoY*MX->getCountStepToMmRatio());
-	BHL(oldXInMm, oldYInMm, newXInMm, newYInMm);
+	//Command queue return x and y value in mm
+	//We need to convert the value into steps for accurate evaluation
+
+	//Old coordinators in step
+	int oldXInStep = int(MX->getCurPos()*MX->getCountStepToMmRatio());
+	int oldYInStep = int(MY->getCurPos()*MY->getCountStepToMmRatio());
+
+	//New coordinators in step
+	int newXInStep = int(commandToQueue.geoX*MX->getCountStepToMmRatio());
+	int newYInStep = int(commandToQueue.geoY*MY->getCountStepToMmRatio());
+
+	//Function to draw
+	BHL(oldXInStep, oldYInStep, newXInStep, newYInStep);
+
+	//Set current position back to motor for later calculation
 	MX->setCurPos(commandToQueue.geoX);
 	MY->setCurPos(commandToQueue.geoY);
 }
@@ -296,6 +272,7 @@ void moveMotor(CommandStruct commandToQueue){
  *This task read command from UART and put it to the Queue
  */
 static void readCommand(void* param){
+	//Calibration will be called only once, before data fro mDraw is accepted
 	calibrate();
 	Syslog* guard = (Syslog*)param;
 	while(1){
@@ -332,8 +309,6 @@ static void readQueue(void* param){
 	}
 }
 
-
-
 int main(void)
 {
 	prvSetupHardware();
@@ -350,6 +325,7 @@ int main(void)
 	//Limit Swiches Y
 	LimitSWYMin = new DigitalIoPin(0,DigitalIoPin::pullup,true);
 	LimitSWYMax = new DigitalIoPin(1,DigitalIoPin::pullup,true);
+	//Create motors with corresponding switches and step and direction pins
 	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax,X,&RIT_start);
 	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax,Y,&RIT_start);
 	/* End of set up motor*/
@@ -363,11 +339,6 @@ int main(void)
 			configMINIMAL_STACK_SIZE, syslog, (tskIDLE_PRIORITY + 1UL),
 			(TaskHandle_t *) NULL);
 
-	/*
-	xTaskCreate(calibrateTask, "calibrateTask",
-			configMINIMAL_STACK_SIZE, calibrateSemaphore, (tskIDLE_PRIORITY + 1UL),
-			(TaskHandle_t *) NULL);
-	 /*
 	/* Start the scheduler */
 	vTaskStartScheduler();
 	/* Should never arrive here */

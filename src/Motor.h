@@ -80,7 +80,7 @@ public:
 
 private:
 	float lengthInMm;
-	int touchCount;
+	int stage;
 	int stepCount;
 	int margin;
 	SemaphoreHandle_t stepSemaphore;

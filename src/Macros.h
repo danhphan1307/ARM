@@ -25,7 +25,7 @@ enum RIT_TYPE  {CALIBRATE, RUN}; // rit running type
 
 
 //calculated in 10 micro meters (um)
-#define xLength 34700
+#define xLength 37000
 #define yLength 31000
 
 #define DefPPS 5000

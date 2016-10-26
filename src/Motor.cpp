@@ -30,7 +30,7 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D,
 	step=0;
 	type=t;
 
-	lengthInMm = type == X ? 380 : 310;
+	lengthInMm = type == X ? 355 : 310;
 	call = _call;
 
 	curPos = 0.0;

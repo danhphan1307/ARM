@@ -116,7 +116,7 @@ void Syslog::getCommand(QueueHandle_t xQueue){
 				switch(t){
 
 				case 1 : //M10 - Send back to mDraw the info.
-					Board_UARTPutSTR("M10 XY 355 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
+					Board_UARTPutSTR("M10 XY 365 310 0.00 0.00 A0 B0 H0 S80 U160 D90\r\n");
 					Board_UARTPutSTR("OK\n");
 					break;
 				case 2: //G28- Do something ?

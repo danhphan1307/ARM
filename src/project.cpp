@@ -68,6 +68,7 @@ static DigitalIoPin* LimitSWYMin;
 static DigitalIoPin* LimitSWYMax;
 static Motor*  MX;
 static Motor*  MY;
+static Laser* laser;
 volatile uint32_t RIT_count;
 xSemaphoreHandle sbRIT = xSemaphoreCreateBinary();
 
@@ -85,11 +86,11 @@ static void prvSetupHardware(void)
 }
 
 static void calibrate(){
-	while (MX->getCalibratedFlag()==false){
-		MX->calibration();
-	}
 	while (MY->getCalibratedFlag()==false){
 		MY->calibration();
+	}
+	while (MX->getCalibratedFlag()==false){
+		MX->calibration();
 	}
 }
 
@@ -276,9 +277,11 @@ static void readCommand(void* param){
 	calibrate();
 	Syslog* guard = (Syslog*)param;
 	while(1){
+
 		if ( xQueue != 0){
 			guard->getCommand(xQueue);
 		}
+
 	}
 }
 
@@ -288,7 +291,7 @@ static void readCommand(void* param){
 static void readQueue(void* param){
 
 	Servo pencil(0,10);
-	Laser laser(0,12);
+
 	Syslog* guard = (Syslog*)param;
 	CommandStruct commandToQueue;
 
@@ -298,12 +301,21 @@ static void readQueue(void* param){
 				pencil.Degree(commandToQueue.degreeServo);
 				guard->write("OK\r\n");
 			}else if (commandToQueue.type ==LASER){
-				laser.Power(commandToQueue.power);
+				laser->Power(commandToQueue.power);
 				guard->write("OK\r\n");
 			}else if (commandToQueue.type ==BOTH_STEPPER){
 				//Motor code goes here.
 				moveMotor(commandToQueue);
-				guard->write("OK\r\n");
+
+				if (MX->isHit() || MY->isHit()){
+					MX->stop();
+					MY->stop();
+					//guard->write("OK\r\n");
+				} else {
+					guard->write("OK\r\n");
+				}
+
+				//guard->write("OK\r\n");
 			}
 		}
 	}
@@ -328,6 +340,7 @@ int main(void)
 	//Create motors with corresponding switches and step and direction pins
 	MX = new Motor(STEPX,DIRX, LimitSWXMin, LimitSWXMax,X,&RIT_start);
 	MY = new Motor(STEPY,DIRY, LimitSWYMin, LimitSWYMax,Y,&RIT_start);
+	laser = new Laser(0,12);
 	/* End of set up motor*/
 	syslog->InitMap();
 

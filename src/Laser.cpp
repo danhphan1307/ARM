@@ -22,7 +22,7 @@ Laser::Laser(int pin,int port)
 	Chip_SCTPWM_SetOutPin(LPC_SCT1, 1, 0); // Index 1 is SCT1_OUT0
 
 
-	LPC_SCT1->MATCH[0].L    = UPPER_LIMIT_LASER-1;
+	//LPC_SCT1->MATCH[0].L    = UPPER_LIMIT_LASER-1;
 	LPC_SCT1->MATCHREL[0].L  = UPPER_LIMIT_LASER-1;
 
 

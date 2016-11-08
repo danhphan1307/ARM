@@ -85,11 +85,11 @@ static void prvSetupHardware(void)
 }
 
 static void calibrate(){
-	while (MX->getCalibratedFlag()==false){
-		MX->calibration();
-	}
 	while (MY->getCalibratedFlag()==false){
 		MY->calibration();
+	}
+	while (MX->getCalibratedFlag()==false){
+		MX->calibration();
 	}
 }
 
@@ -196,7 +196,6 @@ void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 {
 	int speed =MINSPEED;
 
-
 	//calculate x y deltas
 	long deltaX = abs(NewPosX-CurPosX);
 	long deltaY = abs(NewPosY-CurPosY);
@@ -214,13 +213,11 @@ void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 		for(i=0;i<deltaX;i++)
 		{
 			Speedup(CurPosX, CurPosY, NewPosX, NewPosY, origDis, speed);
-			//RIT_start(1,speed,RUN,X);
 			MX->move(speed*2);
 			end+=deltaY;
 			if(end>=deltaX)
 			{
 				end-=deltaX;
-				//RIT_start(1,speed,RUN,Y);
 				MY->move(speed*2);
 			}
 		}
@@ -230,13 +227,11 @@ void BHL(int CurPosX, int CurPosY, int NewPosX, int NewPosY)
 		for(i=0;i<deltaY;i++)
 		{
 			Speedup(CurPosX, CurPosY, NewPosX, NewPosY, origDis, speed);
-			//RIT_start(1,speed,RUN,Y);
 			MY->move(speed*2);
 			end+=deltaX;
 			if(end>=deltaY)
 			{
 				end-=deltaY;
-				//RIT_start(1,speed,RUN,X);
 				MX->move(speed*2);
 			}
 		}
@@ -276,9 +271,11 @@ static void readCommand(void* param){
 	calibrate();
 	Syslog* guard = (Syslog*)param;
 	while(1){
+
 		if ( xQueue != 0){
 			guard->getCommand(xQueue);
 		}
+
 	}
 }
 
@@ -303,7 +300,16 @@ static void readQueue(void* param){
 			}else if (commandToQueue.type ==BOTH_STEPPER){
 				//Motor code goes here.
 				moveMotor(commandToQueue);
-				guard->write("OK\r\n");
+
+				if (MX->isHit() || MY->isHit()){
+					MX->stop();
+					MY->stop();
+					//guard->write("OK\r\n");
+				} else {
+					guard->write("OK\r\n");
+				}
+
+				//guard->write("OK\r\n");
 			}
 		}
 	}

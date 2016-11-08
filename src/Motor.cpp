@@ -19,7 +19,7 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D,
 	STEP->write(false);
 	DIR->write(false);
 
-	pps = 30000;
+	pps = 80000;
 	stage=0;
 	errorRatio = 0.005;
 
@@ -30,7 +30,7 @@ Motor::Motor(DigitalIoPin* S, DigitalIoPin* D,
 	step=0;
 	type=t;
 
-	lengthInMm = type == X ? 355 : 310;
+	lengthInMm = type == X ? 365 : 310;
 	call = _call;
 
 	curPos = 0.0;
@@ -66,7 +66,7 @@ void Motor::reverse()
 {
 }
  */
-void Motor::move(int _pps = 40000)
+void Motor::move(int _pps = 80000)
 {
 	//Check if switch is hit to stop motor
 	if (isHit()){

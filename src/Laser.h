@@ -15,6 +15,5 @@ public:
 private:
 	int pin;
 	int port;
-	int iCurrentPower;
 };
 #endif

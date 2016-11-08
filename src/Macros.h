@@ -13,22 +13,22 @@
 
 enum RIT_TYPE  {CALIBRATE, RUN}; // rit running type
 #define DLY1MS (1/portTICK_PERIOD_MS)
-#define DLY20MS (20/portTICK_PERIOD_MS)
 #define DLY5MS (5/portTICK_PERIOD_MS)
+#define DLY20MS (20/portTICK_PERIOD_MS)
 #define DLY1SEC (1000/portTICK_PERIOD_MS)
 #define DLY5SEC (5000/portTICK_PERIOD_MS)
 #define TICK_RATE 1000000
 
 
-#define MINSPEED 80000
-#define MAXSPEED 180000
+#define MINSPEED 120000
+#define MAXSPEED 165000
 
 
 //calculated in 10 micro meters (um)
 #define xLength 37000
 #define yLength 31000
 
-#define DefPPS 5000
+#define DefPPS 8000
 //the actual max is
 
 //327
